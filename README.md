@@ -448,3 +448,1671 @@ export default function LoginButton() {
 
 
 ---
+
+
+
+# Dynamic Routes in Next.js
+
+Dynamic routes allow you to create pages whose URL contains variable values, such as user IDs, blog post slugs, product IDs, etc.
+
+---
+
+## 1. Creating a Dynamic Route
+
+In the App Router, create a folder using square brackets:
+
+```txt
+app/
+  blog/
+    [slug]/
+      page.tsx
+```
+
+Here, `[slug]` is a dynamic segment.
+
+### URLs Matched
+
+```txt
+/blog/hello-world
+/blog/nextjs-routing
+/blog/my-first-post
+```
+
+---
+
+## 2. Accessing Route Parameters
+
+### App Router (Next.js 13+)
+
+```tsx
+export default async function BlogPost({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params;
+
+  return <h1>Post: {slug}</h1>;
+}
+```
+
+For:
+
+```txt
+/blog/hello-world
+```
+
+`slug` will be:
+
+```js
+"hello-world"
+```
+
+---
+
+## 3. Multiple Dynamic Segments
+
+Folder structure:
+
+```txt
+app/
+  shop/
+    [category]/
+      [productId]/
+        page.tsx
+```
+
+Matches:
+
+```txt
+/shop/electronics/123
+/shop/books/456
+```
+
+Parameters:
+
+```js
+{
+  category: "electronics",
+  productId: "123"
+}
+```
+
+Example:
+
+```tsx
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{
+    category: string;
+    productId: string;
+  }>;
+}) {
+  const { category, productId } = await params;
+
+  return (
+    <>
+      <h1>Category: {category}</h1>
+      <h2>Product: {productId}</h2>
+    </>
+  );
+}
+```
+
+---
+
+## 4. Generating Static Pages
+
+If you know the possible route values beforehand, use `generateStaticParams`.
+
+```tsx
+export async function generateStaticParams() {
+  return [
+    { slug: "post-1" },
+    { slug: "post-2" },
+    { slug: "post-3" },
+  ];
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params;
+
+  return <div>{slug}</div>;
+}
+```
+
+Next.js pre-renders these pages at build time.
+
+---
+
+## 5. Dynamic Routes vs Catch-All Routes
+
+### Dynamic Route
+
+```txt
+app/blog/[slug]/page.tsx
+```
+
+Matches:
+
+```txt
+/blog/post-1
+```
+
+Does not match:
+
+```txt
+/blog/post-1/comments
+```
+
+---
+
+### Catch-All Route
+
+```txt
+app/blog/[...slug]/page.tsx
+```
+
+Matches:
+
+```txt
+/blog/post-1
+/blog/post-1/comments
+/blog/post-1/comments/replies
+```
+
+Parameters:
+
+```js
+{
+  slug: ["post-1", "comments", "replies"]
+}
+```
+
+---
+
+## 6. Reading Params in Client Components
+
+Use `useParams()`.
+
+```tsx
+"use client";
+
+import { useParams } from "next/navigation";
+
+export default function Page() {
+  const params = useParams();
+
+  return <p>{params.slug}</p>;
+}
+```
+
+For:
+
+```txt
+/blog/nextjs
+```
+
+Output:
+
+```txt
+nextjs
+```
+
+---
+
+### Quick Comparison
+
+| Route Type         | Folder Name       | Example URL            | Params                            |
+| ------------------ | ----------------- | ---------------------- | --------------------------------- |
+| Static             | `about`           | `/about`               | None                              |
+| Dynamic            | `[id]`            | `/users/42`            | `{ id: "42" }`                    |
+| Multiple Dynamic   | `[category]/[id]` | `/shop/books/10`       | `{ category: "books", id: "10" }` |
+| Catch-All          | `[...slug]`       | `/docs/api/auth`       | `{ slug: ["api", "auth"] }`       |
+| Optional Catch-All | `[[...slug]]`     | `/docs` or `/docs/api` | `{ slug: undefined }` or array    |
+
+A simple rule: **`[param]` captures one URL segment, while `[...param]` captures all remaining segments as an array.**
+
+
+
+
+
+---
+
+
+
+
+# Nested Dynamic Routing in Next.js
+
+**Nested dynamic routing** means having dynamic segments at multiple levels of the URL hierarchy.
+
+For example:
+
+```txt
+/products/electronics/123
+/products/books/456
+```
+
+Here:
+
+* `electronics` / `books` → category
+* `123` / `456` → product ID
+
+---
+
+## Folder Structure
+
+```txt
+app/
+└── products/
+    └── [category]/
+        └── [productId]/
+            └── page.tsx
+```
+
+### URL
+
+```txt
+/products/electronics/123
+```
+
+### Params
+
+```js
+{
+  category: "electronics",
+  productId: "123"
+}
+```
+
+---
+
+## Accessing Nested Params
+
+```tsx
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{
+    category: string;
+    productId: string;
+  }>;
+}) {
+  const { category, productId } = await params;
+
+  return (
+    <div>
+      <h1>Category: {category}</h1>
+      <h2>Product ID: {productId}</h2>
+    </div>
+  );
+}
+```
+
+Visiting:
+
+```txt
+/products/electronics/123
+```
+
+renders:
+
+```txt
+Category: electronics
+Product ID: 123
+```
+
+---
+
+## Deeper Nesting
+
+You can keep nesting as much as needed.
+
+```txt
+app/
+└── company/
+    └── [department]/
+        └── [team]/
+            └── [employeeId]/
+                └── page.tsx
+```
+
+URL:
+
+```txt
+/company/engineering/frontend/101
+```
+
+Params:
+
+```js
+{
+  department: "engineering",
+  team: "frontend",
+  employeeId: "101"
+}
+```
+
+---
+
+## Nested Layouts with Dynamic Routes
+
+One powerful feature of the App Router is that layouts can access parent route params.
+
+Structure:
+
+```txt
+app/
+└── products/
+    └── [category]/
+        ├── layout.tsx
+        └── [productId]/
+            └── page.tsx
+```
+
+### Category Layout
+
+```tsx
+export default async function CategoryLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ category: string }>;
+}) {
+  const { category } = await params;
+
+  return (
+    <>
+      <h1>{category.toUpperCase()}</h1>
+      {children}
+    </>
+  );
+}
+```
+
+For:
+
+```txt
+/products/electronics/123
+```
+
+The layout receives:
+
+```js
+{
+  category: "electronics"
+}
+```
+
+and wraps all product pages in that category.
+
+---
+
+## Dynamic + Static Segments
+
+You can mix static and dynamic folders.
+
+```txt
+app/
+└── blog/
+    └── [slug]/
+        └── comments/
+            └── [commentId]/
+                └── page.tsx
+```
+
+Matches:
+
+```txt
+/blog/nextjs-routing/comments/25
+```
+
+Params:
+
+```js
+{
+  slug: "nextjs-routing",
+  commentId: "25"
+}
+```
+
+---
+
+## Real-World Example: E-commerce
+
+```txt
+app/
+└── shop/
+    └── [category]/
+        └── [subcategory]/
+            └── [productId]/
+                └── page.tsx
+```
+
+URL:
+
+```txt
+/shop/electronics/laptops/123
+```
+
+Params:
+
+```js
+{
+  category: "electronics",
+  subcategory: "laptops",
+  productId: "123"
+}
+```
+
+This is nested dynamic routing because multiple levels of the route tree are dynamic.
+
+---
+
+## Nested Dynamic Route vs Catch-All
+
+### Nested Dynamic
+
+```txt
+app/shop/[category]/[productId]/page.tsx
+```
+
+Only matches:
+
+```txt
+/shop/electronics/123
+```
+
+---
+
+### Catch-All
+
+```txt
+app/shop/[...slug]/page.tsx
+```
+
+Matches:
+
+```txt
+/shop/electronics
+/shop/electronics/laptops
+/shop/electronics/laptops/123
+```
+
+and returns:
+
+```js
+{
+  slug: ["electronics", "laptops", "123"]
+}
+```
+
+### Rule of Thumb
+
+Use **nested dynamic routes** when each URL segment has a specific meaning:
+
+```txt
+/users/[userId]/posts/[postId]
+```
+
+Use **catch-all routes** when you don't know how many segments you'll receive:
+
+```txt
+/docs/[...slug]
+```
+
+
+
+
+---
+
+
+
+
+# catch-all segment
+
+In **Next.js App Router**, a **catch-all segment** lets a route match **any number of URL segments**.
+
+### Basic Syntax
+
+Create a folder with `[...]`:
+
+```txt
+app/
+  docs/
+    [...slug]/
+      page.tsx
+```
+
+The folder name `[...]` indicates a catch-all route.
+
+### Example URLs
+
+For:
+
+```txt
+app/docs/[...slug]/page.tsx
+```
+
+These URLs will match:
+
+```txt
+/ docs/a
+/ docs/a/b
+/ docs/a/b/c
+```
+
+and `params.slug` will be:
+
+```js
+// /docs/a
+{ slug: ["a"] }
+
+// /docs/a/b
+{ slug: ["a", "b"] }
+
+// /docs/a/b/c
+{ slug: ["a", "b", "c"] }
+```
+
+### Accessing the Parameters
+
+```tsx
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string[] }>
+}) {
+  const { slug } = await params;
+
+  return (
+    <div>
+      {slug.join(" / ")}
+    </div>
+  );
+}
+```
+
+---
+
+## Optional Catch-All Segments
+
+If you want the route to also match the parent path itself, use double brackets:
+
+```txt
+app/docs/[[...slug]]/page.tsx
+```
+
+Now these URLs match:
+
+```txt
+/docs
+/docs/a
+/docs/a/b
+/docs/a/b/c
+```
+
+The values become:
+
+```js
+// /docs
+{ slug: undefined }
+
+// /docs/a
+{ slug: ["a"] }
+
+// /docs/a/b
+{ slug: ["a", "b"] }
+```
+
+---
+
+## Catch-All vs Dynamic Segments
+
+### Dynamic Segment
+
+```txt
+app/blog/[id]/page.tsx
+```
+
+Matches:
+
+```txt
+/blog/123
+```
+
+Does **not** match:
+
+```txt
+/blog/123/comments
+```
+
+---
+
+### Catch-All Segment
+
+```txt
+app/blog/[...slug]/page.tsx
+```
+
+Matches:
+
+```txt
+/blog/123
+/blog/123/comments
+/blog/123/comments/replies
+```
+
+---
+
+## Common Use Cases
+
+### Documentation Sites
+
+```txt
+/docs/getting-started
+/docs/api/auth/login
+/docs/guides/deployment/vercel
+```
+
+Route:
+
+```txt
+app/docs/[...slug]/page.tsx
+```
+
+---
+
+### Category Hierarchies
+
+```txt
+/shop/electronics
+/shop/electronics/laptops
+/shop/electronics/laptops/gaming
+```
+
+Route:
+
+```txt
+app/shop/[...categories]/page.tsx
+```
+
+---
+
+### CMS-Driven Pages
+
+```txt
+/about
+/company/team
+/company/history
+```
+
+Route:
+
+```txt
+app/[[...slug]]/page.tsx
+```
+
+You can look up content based on the slug array and render the appropriate page.
+
+---
+
+## Route Priority
+
+Next.js prefers **more specific routes** over catch-all routes.
+
+Example:
+
+```txt
+app/
+  docs/
+    page.tsx
+    api/
+      page.tsx
+    [...slug]/
+      page.tsx
+```
+
+Requests resolve as:
+
+```txt
+/docs      -> docs/page.tsx
+/docs/api  -> docs/api/page.tsx
+/docs/xyz  -> docs/[...slug]/page.tsx
+```
+
+The catch-all route acts as a fallback after more specific matches are checked.
+
+### Summary
+
+| Route Type         | Syntax        | Matches               |
+| ------------------ | ------------- | --------------------- |
+| Dynamic            | `[id]`        | One segment           |
+| Catch-all          | `[...slug]`   | One or more segments  |
+| Optional catch-all | `[[...slug]]` | Zero or more segments |
+
+Think of `[id]` as matching **exactly one path part**, while `[...slug]` matches **the rest of the path as an array**.
+
+
+
+
+---
+
+
+
+
+# `not-found.tsx` in Next.js (App Router)
+
+Next.js provides a special file called `not-found.tsx` to render a **404 page** when content doesn't exist.
+
+---
+
+## Basic Setup
+
+Create:
+
+```txt
+app/
+├── not-found.tsx
+├── page.tsx
+```
+
+```tsx
+// app/not-found.tsx
+export default function NotFound() {
+  return (
+    <div>
+      <h1>404 - Page Not Found</h1>
+      <p>The page you're looking for doesn't exist.</p>
+    </div>
+  );
+}
+```
+
+This becomes your custom 404 page.
+
+---
+
+## Triggering a Not Found Page
+
+Import `notFound()` from `next/navigation`:
+
+```tsx
+import { notFound } from "next/navigation";
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  const product = await getProduct(id);
+
+  if (!product) {
+    notFound();
+  }
+
+  return <h1>{product.name}</h1>;
+}
+```
+
+If the product doesn't exist:
+
+```txt
+/products/999
+```
+
+Next.js renders `not-found.tsx`.
+
+---
+
+## Dynamic Route Example
+
+Folder structure:
+
+```txt
+app/
+└── products/
+    └── [id]/
+        └── page.tsx
+```
+
+```tsx
+import { notFound } from "next/navigation";
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  const validProducts = ["1", "2", "3"];
+
+  if (!validProducts.includes(id)) {
+    notFound();
+  }
+
+  return <h1>Product {id}</h1>;
+}
+```
+
+### Result
+
+```txt
+/products/1   ✅ Product page
+/products/99  ❌ Shows not-found.tsx
+```
+
+---
+
+## Route-Specific Not Found Pages
+
+You can create a `not-found.tsx` inside a route segment.
+
+```txt
+app/
+├── not-found.tsx
+└── blog/
+    ├── not-found.tsx
+    └── [slug]/
+        └── page.tsx
+```
+
+When `notFound()` is called inside `/blog`, Next.js uses:
+
+```txt
+app/blog/not-found.tsx
+```
+
+instead of the root one.
+
+Example:
+
+```tsx
+// app/blog/not-found.tsx
+export default function BlogNotFound() {
+  return <h1>Blog post not found</h1>;
+}
+```
+
+---
+
+## Add a Link Back Home
+
+```tsx
+import Link from "next/link";
+
+export default function NotFound() {
+  return (
+    <div>
+      <h1>404</h1>
+      <p>Page not found</p>
+
+      <Link href="/">
+        Go Home
+      </Link>
+    </div>
+  );
+}
+```
+
+---
+
+## `notFound()` vs `redirect()`
+
+### `notFound()`
+
+```tsx
+import { notFound } from "next/navigation";
+
+if (!user) {
+  notFound();
+}
+```
+
+Result:
+
+```txt
+404 Page
+```
+
+---
+
+### `redirect()`
+
+```tsx
+import { redirect } from "next/navigation";
+
+if (!user) {
+  redirect("/login");
+}
+```
+
+Result:
+
+```txt
+User is sent to /login
+```
+
+---
+
+## App Router vs Pages Router
+
+### App Router
+
+```txt
+app/not-found.tsx
+```
+
+Uses:
+
+```tsx
+import { notFound } from "next/navigation";
+```
+
+---
+
+### Pages Router (older)
+
+```txt
+pages/404.js
+```
+
+Example:
+
+```tsx
+export default function Custom404() {
+  return <h1>404 - Page Not Found</h1>;
+}
+```
+
+---
+
+### Common Interview Question
+
+**Q:** Why call `notFound()` instead of returning JSX?
+
+Because `notFound()` immediately stops rendering and tells Next.js to return a proper **404 HTTP status code** and render the nearest `not-found.tsx`.
+
+```tsx
+if (!data) {
+  notFound();
+}
+```
+
+This is the recommended approach for handling missing resources in the App Router.
+
+
+
+
+---
+
+
+
+
+# File Colocation in Next.js
+
+**File colocation** means keeping files that belong to a route or feature **next to each other in the same folder**, instead of placing everything in separate global folders.
+
+The App Router in Next.js is designed around this idea.
+
+---
+
+## Example
+
+Suppose you have a product page.
+
+```txt id="j8q1m9"
+app/
+└── products/
+    └── [id]/
+        ├── page.tsx
+        ├── loading.tsx
+        ├── error.tsx
+        ├── not-found.tsx
+        ├── ProductDetails.tsx
+        ├── ProductReviews.tsx
+        └── styles.module.css
+```
+
+All files related to the product route are colocated in the same folder.
+
+---
+
+## Why Colocation?
+
+Without colocation, you might have:
+
+```txt id="vr9gbt"
+components/
+├── ProductDetails.tsx
+├── ProductReviews.tsx
+
+styles/
+├── product.module.css
+
+pages/
+├── products/
+│   └── [id].tsx
+```
+
+As the application grows, finding related files becomes harder.
+
+With colocation:
+
+```txt id="6nvvj8"
+app/
+└── products/
+    └── [id]/
+```
+
+everything for that route lives together.
+
+---
+
+## What Gets Exposed as Routes?
+
+Only special files create routes:
+
+```txt id="fjlwmv"
+page.tsx
+layout.tsx
+loading.tsx
+error.tsx
+not-found.tsx
+route.ts
+template.tsx
+default.tsx
+```
+
+Regular files are ignored by the router.
+
+Example:
+
+```txt id="cn96hl"
+app/
+└── dashboard/
+    ├── page.tsx
+    ├── Chart.tsx
+    ├── Table.tsx
+    └── utils.ts
+```
+
+Only:
+
+```txt id="34j9o4"
+/dashboard
+```
+
+becomes a route.
+
+`Chart.tsx`, `Table.tsx`, and `utils.ts` are private implementation files.
+
+---
+
+## Private Folders
+
+You can use folders starting with `_` to indicate internal-only code.
+
+```txt id="h6bpzs"
+app/
+└── dashboard/
+    ├── page.tsx
+    └── _components/
+        ├── Chart.tsx
+        └── Table.tsx
+```
+
+Usage:
+
+```tsx id="bwn3xb"
+import Chart from "./_components/Chart";
+
+export default function DashboardPage() {
+  return <Chart />;
+}
+```
+
+The `_components` folder does not affect routing.
+
+---
+
+## Route Groups + Colocation
+
+You can organize files without changing the URL.
+
+```txt id="yd3of7"
+app/
+├── (marketing)/
+│   ├── about/
+│   │   └── page.tsx
+│   └── contact/
+│       └── page.tsx
+```
+
+URLs:
+
+```txt id="kfxr16"
+/about
+/contact
+```
+
+The `(marketing)` folder is only for organization.
+
+---
+
+## Real-World Example
+
+```txt id="vkg4wj"
+app/
+└── blog/
+    └── [slug]/
+        ├── page.tsx
+        ├── loading.tsx
+        ├── error.tsx
+        ├── not-found.tsx
+        ├── BlogContent.tsx
+        ├── BlogComments.tsx
+        └── actions.ts
+```
+
+Benefits:
+
+* Easier navigation
+* Related files stay together
+* Better scalability
+* Less context switching
+
+---
+
+## Interview Answer
+
+**What is file colocation in Next.js?**
+
+> File colocation is the practice of keeping route-specific components, styles, utilities, loading states, error boundaries, and other related files in the same route folder. In the App Router, Next.js only treats special files such as `page.tsx`, `layout.tsx`, and `loading.tsx` as routing files, while other colocated files remain private and can be used by that route. This improves maintainability and organization.
+
+
+
+
+---
+
+
+
+
+# Private Folders in Next.js
+
+A **private folder** is a folder whose name starts with an underscore (`_`).
+
+```txt id="a8d2r1"
+app/
+└── dashboard/
+    ├── page.tsx
+    └── _components/
+        ├── Chart.tsx
+        └── Table.tsx
+```
+
+Next.js **ignores private folders when creating routes**.
+
+---
+
+## Why Use Private Folders?
+
+Private folders help organize route-specific code without affecting the URL structure.
+
+Example:
+
+```txt id="d4m7k9"
+app/
+└── dashboard/
+    ├── page.tsx
+    ├── _components/
+    ├── _hooks/
+    ├── _lib/
+    └── _types/
+```
+
+This makes it clear that these folders contain internal implementation details.
+
+---
+
+## Example
+
+### Folder Structure
+
+```txt id="r2n8v5"
+app/
+└── dashboard/
+    ├── page.tsx
+    └── _components/
+        └── UserCard.tsx
+```
+
+### Component
+
+```tsx id="f6p1w3"
+// app/dashboard/_components/UserCard.tsx
+
+export default function UserCard() {
+  return <div>User Card</div>;
+}
+```
+
+### Page
+
+```tsx id="u9c4e7"
+import UserCard from "./_components/UserCard";
+
+export default function DashboardPage() {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <UserCard />
+    </div>
+  );
+}
+```
+
+URL:
+
+```txt id="k1x7b2"
+/dashboard
+```
+
+There is **no route** for `_components`.
+
+---
+
+## What Happens Without `_`?
+
+If you create:
+
+```txt id="m5q9z4"
+app/
+└── dashboard/
+    └── components/
+        └── UserCard.tsx
+```
+
+Next.js won't automatically make `components` a route because it doesn't contain `page.tsx`.
+
+However, using `_components` communicates that the folder is meant only for internal use and should never become part of the routing structure.
+
+---
+
+## Common Pattern
+
+```txt id="n3w6h8"
+app/
+└── products/
+    └── [id]/
+        ├── page.tsx
+        ├── loading.tsx
+        ├── error.tsx
+        ├── _components/
+        │   ├── ProductInfo.tsx
+        │   └── ProductReviews.tsx
+        ├── _lib/
+        │   └── getProduct.ts
+        └── _types/
+            └── product.ts
+```
+
+This keeps everything related to the product route together.
+
+---
+
+## Escaping an Underscore
+
+What if you actually want a URL segment that starts with `_`?
+
+Use URL encoding:
+
+```txt id="q8j2v6"
+app/
+└── %5Fsettings/
+    └── page.tsx
+```
+
+`%5F` is the URL-encoded form of `_`.
+
+Resulting URL:
+
+```txt id="z7r4m1"
+/_settings
+```
+
+---
+
+## Private Folder vs Route Group
+
+### Private Folder
+
+```txt id="y5k8c3"
+app/
+└── dashboard/
+    └── _components/
+```
+
+* For internal organization.
+* Not part of routing.
+* Usually stores components, hooks, utilities, etc.
+
+---
+
+### Route Group
+
+```txt id="v2n7p9"
+app/
+└── (admin)/
+    └── dashboard/
+        └── page.tsx
+```
+
+URL:
+
+```txt id="e4m1s6"
+/dashboard
+```
+
+* Organizes routes.
+* Can share layouts among grouped routes.
+* Folder name is omitted from the URL.
+
+---
+
+## Interview Answer
+
+**What are private folders in Next.js?**
+
+> Private folders are folders whose names start with an underscore (`_`). Next.js ignores them for routing purposes, allowing developers to colocate route-specific components, hooks, utilities, and other implementation files alongside a route without affecting the URL structure. They are mainly used for organization and maintainability.
+
+
+
+
+---
+
+
+
+
+# Route Groups in Next.js
+
+**Route Groups** allow you to organize routes into folders **without affecting the URL path**.
+
+A route group folder is wrapped in parentheses:
+
+```txt id="f9k2m7"
+(marketing)
+(admin)
+(shop)
+```
+
+---
+
+## Basic Example
+
+Folder structure:
+
+```txt id="a3v8p1"
+app/
+└── (marketing)/
+    ├── about/
+    │   └── page.tsx
+    └── contact/
+        └── page.tsx
+```
+
+Generated URLs:
+
+```txt id="r6n4w2"
+/about
+/contact
+```
+
+Notice that `(marketing)` does **not** appear in the URL.
+
+---
+
+## Why Use Route Groups?
+
+As applications grow, you may want to organize routes by feature, team, or layout without changing URLs.
+
+Without route groups:
+
+```txt id="m8q5t3"
+app/
+├── about/
+├── contact/
+├── dashboard/
+├── settings/
+```
+
+With route groups:
+
+```txt id="j1c7k9"
+app/
+├── (marketing)/
+│   ├── about/
+│   └── contact/
+│
+└── (dashboard)/
+    ├── dashboard/
+    └── settings/
+```
+
+URLs remain:
+
+```txt id="p4x6h8"
+/about
+/contact
+/dashboard
+/settings
+```
+
+---
+
+## Using Different Layouts
+
+One of the most common uses of route groups is applying different layouts to different sections of the app.
+
+### Folder Structure
+
+```txt id="w2n9d5"
+app/
+├── (marketing)/
+│   ├── layout.tsx
+│   ├── about/
+│   │   └── page.tsx
+│   └── contact/
+│       └── page.tsx
+│
+└── (dashboard)/
+    ├── layout.tsx
+    ├── dashboard/
+    │   └── page.tsx
+    └── settings/
+        └── page.tsx
+```
+
+---
+
+### Marketing Layout
+
+```tsx id="g7m3q1"
+export default function MarketingLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <header>Marketing Navbar</header>
+      {children}
+    </>
+  );
+}
+```
+
+---
+
+### Dashboard Layout
+
+```tsx id="u5r8k4"
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <aside>Sidebar</aside>
+      {children}
+    </>
+  );
+}
+```
+
+Result:
+
+```txt id="z9b2c6"
+/about      -> Marketing Layout
+/contact    -> Marketing Layout
+
+/dashboard  -> Dashboard Layout
+/settings   -> Dashboard Layout
+```
+
+---
+
+## Multiple Root Layouts
+
+Route groups can be used to create separate root layouts.
+
+```txt id="e4t7y1"
+app/
+├── (shop)/
+│   ├── layout.tsx
+│   └── products/
+│       └── page.tsx
+│
+└── (admin)/
+    ├── layout.tsx
+    └── dashboard/
+        └── page.tsx
+```
+
+This allows the shop and admin sections to have completely different UI structures.
+
+---
+
+## Important Rule
+
+You cannot have two routes resolving to the same URL.
+
+❌ Invalid:
+
+```txt id="h6k1v8"
+app/
+├── (marketing)/
+│   └── about/
+│       └── page.tsx
+
+└── (admin)/
+    └── about/
+        └── page.tsx
+```
+
+Both would generate:
+
+```txt id="n3p5w7"
+/about
+```
+
+Next.js throws a build error because the routes conflict.
+
+---
+
+## Route Groups vs Private Folders
+
+### Route Group
+
+```txt id="s8q4m2"
+(marketing)
+```
+
+* Organizes routes.
+* Can have layouts.
+* Removed from URL.
+* Used for route structure.
+
+---
+
+### Private Folder
+
+```txt id="d5r7k1"
+_components
+```
+
+* Organizes code.
+* Not used for routing.
+* Typically stores components, hooks, utilities.
+
+---
+
+## Real-World Example
+
+```txt id="c2v9n6"
+app/
+├── (public)/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   ├── about/
+│   └── contact/
+│
+├── (auth)/
+│   ├── layout.tsx
+│   ├── login/
+│   └── register/
+│
+└── (dashboard)/
+    ├── layout.tsx
+    ├── dashboard/
+    ├── settings/
+    └── analytics/
+```
+
+URLs:
+
+```txt id="m1x8b4"
+/
+/about
+/contact
+
+/login
+/register
+
+/dashboard
+/settings
+/analytics
+```
+
+Each section can have its own layout while keeping clean URLs.
+
+---
+
+### Interview Answer
+
+> Route Groups are folders wrapped in parentheses, such as `(marketing)` or `(dashboard)`. They help organize routes and apply different layouts without affecting the URL structure. The folder name is omitted from the generated route, making route groups useful for separating application sections like public pages, authentication pages, and dashboards while maintaining clean URLs.
+
+
+
+
+---
