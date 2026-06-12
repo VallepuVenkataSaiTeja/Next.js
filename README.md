@@ -6763,3 +6763,209 @@ The `@` folders are layout slots, not URL segments.
 
 
 ---
+
+
+
+# `hierarchy` :
+
+If you want to understand the **hierarchy (which wraps which)**, think of it as a tree from top → bottom.
+
+For a route like `/dashboard/analytics`:
+
+```text
+global-error.tsx
+    │
+    ▼
+layout.tsx (Root Layout)
+    │
+    ├── metadata
+    ├── template.tsx
+    │
+    ▼
+dashboard/layout.tsx
+    │
+    ├── metadata
+    ├── dashboard/template.tsx
+    │
+    ▼
+analytics/layout.tsx
+    │
+    ▼
+loading.tsx (shown temporarily if needed)
+    │
+    ▼
+error.tsx (catches errors below it)
+    │
+    ▼
+page.tsx
+```
+
+---
+
+A more visual representation:
+
+```html
+<global-error>
+    <root-layout>
+
+        <root-template>
+
+            <dashboard-layout>
+
+                <dashboard-template>
+
+                    <analytics-layout>
+
+                        <error-boundary>
+
+                            <loading-fallback>
+
+                                <page />
+
+                            </loading-fallback>
+
+                        </error-boundary>
+
+                    </analytics-layout>
+
+                </dashboard-template>
+
+            </dashboard-layout>
+
+        </root-template>
+
+    </root-layout>
+</global-error>
+```
+
+---
+
+### Where each file sits
+
+```html
+<global-error.tsx>
+
+    <layout.tsx>
+
+        <template.tsx>
+
+            <error.tsx>
+
+                <loading.tsx>
+
+                    <page.tsx />
+
+                </loading.tsx>
+
+            </error.tsx>
+
+        </template.tsx>
+
+    </layout.tsx>
+
+</global-error.tsx>
+```
+
+---
+
+### What each one does
+
+```html
+<global-error>  <!-- catches root layout crashes -->
+
+    <layout>     <!-- persistent UI -->
+
+        <template>  <!-- remounts every navigation -->
+
+            <error> <!-- catches runtime errors -->
+
+                <loading> <!-- temporary loading UI -->
+
+                    <page /> <!-- actual route content -->
+
+                </loading>
+
+            </error>
+
+        </template>
+
+    </layout>
+
+</global-error>
+```
+
+---
+
+### Example with nested layouts
+
+Folder:
+
+```text
+app/
+├── layout.tsx
+│
+└── dashboard/
+    ├── layout.tsx
+    │
+    └── analytics/
+        └── page.tsx
+```
+
+Render tree:
+
+```html
+<root-layout>
+
+    <dashboard-layout>
+
+        <analytics-page />
+
+    </dashboard-layout>
+
+</root-layout>
+```
+
+If templates exist:
+
+```html
+<root-layout>
+
+    <root-template>
+
+        <dashboard-layout>
+
+            <dashboard-template>
+
+                <analytics-page />
+
+            </dashboard-template>
+
+        </dashboard-layout>
+
+    </root-template>
+
+</root-layout>
+```
+
+The easiest rule to remember is:
+
+```text
+GlobalError
+   └── Layout
+         └── Template
+               └── Error
+                     └── Loading
+                           └── Page
+```
+
+and for nested routes:
+
+```text
+Root Layout
+   └── Child Layout
+         └── Child Layout
+               └── Page
+```
+
+Everything ultimately wraps the `page.tsx`, which is always the innermost route content.
+
