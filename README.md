@@ -2116,3 +2116,4650 @@ Each section can have its own layout while keeping clean URLs.
 
 
 ---
+
+
+
+
+# `Layout` :
+
+Layouts are one of the core concepts of the Next.js App Router.
+
+A **layout is a shared UI wrapper** that persists across navigation within a route segment.
+
+---
+
+# What is a Layout?
+
+Suppose every page should have:
+
+* Header
+* Navigation
+* Footer
+
+Instead of repeating them in every page:
+
+```tsx
+<HomePage />
+<AboutPage />
+<ContactPage />
+```
+
+you put them in a layout.
+
+```text
+Header
+  ↓
+Page Content
+  ↓
+Footer
+```
+
+---
+
+# Root Layout
+
+Every App Router application must have:
+
+```text
+app/
+└── layout.tsx
+```
+
+Example:
+
+```tsx
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+`children` represents the current page or nested layout.
+
+---
+
+# Example Structure
+
+```text
+app/
+├── layout.tsx
+├── page.tsx
+└── about/
+    └── page.tsx
+```
+
+Root layout:
+
+```tsx
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html>
+      <body>
+        <header>Header</header>
+
+        {children}
+
+        <footer>Footer</footer>
+      </body>
+    </html>
+  );
+}
+```
+
+---
+
+## Visiting `/`
+
+Page:
+
+```tsx
+export default function Home() {
+  return <h1>Home Page</h1>;
+}
+```
+
+Rendered:
+
+```text
+Header
+
+Home Page
+
+Footer
+```
+
+---
+
+## Visiting `/about`
+
+Page:
+
+```tsx
+export default function About() {
+  return <h1>About Page</h1>;
+}
+```
+
+Rendered:
+
+```text
+Header
+
+About Page
+
+Footer
+```
+
+Same layout, different page.
+
+---
+
+# Nested Layouts
+
+You can create layouts inside route segments.
+
+```text
+app/
+├── layout.tsx
+├── page.tsx
+└── dashboard/
+    ├── layout.tsx
+    └── page.tsx
+```
+
+---
+
+## Root Layout
+
+```tsx
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html>
+      <body>
+        <header>Main Header</header>
+
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+---
+
+## Dashboard Layout
+
+```tsx
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <aside>Dashboard Sidebar</aside>
+
+      {children}
+    </div>
+  );
+}
+```
+
+---
+
+## Visiting `/dashboard`
+
+Rendered:
+
+```text
+Main Header
+
+Dashboard Sidebar
+
+Dashboard Page
+```
+
+Layout nesting happens automatically.
+
+---
+
+# Layout Nesting Tree
+
+Structure:
+
+```text
+app/
+├── layout.tsx
+└── dashboard/
+    ├── layout.tsx
+    └── analytics/
+        └── page.tsx
+```
+
+Tree:
+
+```text
+RootLayout
+    ↓
+DashboardLayout
+    ↓
+AnalyticsPage
+```
+
+Render order:
+
+```text
+RootLayout
+ └── DashboardLayout
+      └── AnalyticsPage
+```
+
+---
+
+# Why Layouts Are Special
+
+Unlike pages, layouts **persist** during navigation.
+
+Example:
+
+```text
+/dashboard
+```
+
+Navigate to:
+
+```text
+/dashboard/analytics
+```
+
+Next.js does NOT remount:
+
+```text
+DashboardLayout
+```
+
+Only the child content changes.
+
+---
+
+# State Persistence
+
+Layout:
+
+```tsx
+"use client";
+
+import { useState } from "react";
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [count, setCount] = useState(0);
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>
+        {count}
+      </button>
+
+      {children}
+    </>
+  );
+}
+```
+
+Click:
+
+```text
+5
+```
+
+Navigate:
+
+```text
+/dashboard/settings
+```
+
+Still:
+
+```text
+5
+```
+
+Because the layout was not remounted.
+
+---
+
+# Layout vs Template
+
+### Layout
+
+```text
+Persists
+Keeps state
+Does not remount
+```
+
+### Template
+
+```text
+Remounts every navigation
+Resets state
+Effects run again
+```
+
+Example:
+
+```text
+layout.tsx
+```
+
+Counter stays:
+
+```text
+5 → 5
+```
+
+Navigate.
+
+Example:
+
+```text
+template.tsx
+```
+
+Counter resets:
+
+```text
+5 → 0
+```
+
+---
+
+# Layout and Metadata
+
+Layouts can define metadata.
+
+```tsx
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: {
+    default: "My App",
+    template: "%s | My App",
+  },
+};
+```
+
+Child pages inherit it.
+
+---
+
+# Layout and Error Boundaries
+
+```text
+dashboard/
+├── layout.tsx
+├── error.tsx
+└── page.tsx
+```
+
+`dashboard/error.tsx` catches:
+
+```text
+dashboard/page.tsx
+dashboard/template.tsx
+dashboard/loading.tsx
+nested routes
+```
+
+but NOT:
+
+```text
+dashboard/layout.tsx
+```
+
+because the layout is above its own error boundary.
+
+---
+
+# Layout and Loading UI
+
+```text
+dashboard/
+├── layout.tsx
+├── loading.tsx
+└── page.tsx
+```
+
+When dashboard content loads slowly:
+
+```text
+loading.tsx
+```
+
+appears while the layout remains visible.
+
+---
+
+# Interview Answer
+
+> A layout in Next.js App Router is a shared UI wrapper that persists across route navigation. Layouts can be nested, receive `children` as props, preserve state between navigations, share UI like headers and sidebars, define metadata, and serve as the structural foundation for loading states, error boundaries, and parallel routes.
+
+
+
+
+
+---
+
+
+
+
+# `Nested layouts` :
+
+Nested layouts are simply **layouts inside other layouts**.
+
+Each route segment can have its own `layout.tsx`, and Next.js automatically nests them together.
+
+---
+
+# Example Structure
+
+```text
+app/
+├── layout.tsx
+├── page.tsx
+│
+└── dashboard/
+    ├── layout.tsx
+    ├── page.tsx
+    │
+    └── analytics/
+        └── page.tsx
+```
+
+---
+
+# Root Layout
+
+`app/layout.tsx`
+
+```tsx
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html>
+      <body>
+        <header>Main Header</header>
+
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+---
+
+# Dashboard Layout
+
+`app/dashboard/layout.tsx`
+
+```tsx
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <aside>Dashboard Sidebar</aside>
+
+      {children}
+    </div>
+  );
+}
+```
+
+---
+
+# Dashboard Page
+
+`app/dashboard/page.tsx`
+
+```tsx
+export default function DashboardPage() {
+  return <h1>Dashboard Home</h1>;
+}
+```
+
+---
+
+## Visiting `/dashboard`
+
+Render tree:
+
+```text
+RootLayout
+    ↓
+DashboardLayout
+    ↓
+DashboardPage
+```
+
+UI:
+
+```text
+Main Header
+
+Dashboard Sidebar
+
+Dashboard Home
+```
+
+---
+
+# Deeper Nesting
+
+Add another layout:
+
+```text
+app/
+└── dashboard/
+    ├── layout.tsx
+    │
+    └── analytics/
+        ├── layout.tsx
+        └── page.tsx
+```
+
+---
+
+## Analytics Layout
+
+```tsx
+export default function AnalyticsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <h2>Analytics Navigation</h2>
+
+      {children}
+    </div>
+  );
+}
+```
+
+---
+
+## Analytics Page
+
+```tsx
+export default function AnalyticsPage() {
+  return <h1>Analytics Data</h1>;
+}
+```
+
+---
+
+## Visiting `/dashboard/analytics`
+
+Render tree:
+
+```text
+RootLayout
+    ↓
+DashboardLayout
+    ↓
+AnalyticsLayout
+    ↓
+AnalyticsPage
+```
+
+UI:
+
+```text
+Main Header
+
+Dashboard Sidebar
+
+Analytics Navigation
+
+Analytics Data
+```
+
+---
+
+# Visualizing the Nesting
+
+Think of layouts wrapping each other like boxes:
+
+```text
+Root Layout
+┌──────────────────────────┐
+│ Header                   │
+│                          │
+│ Dashboard Layout         │
+│ ┌──────────────────────┐ │
+│ │ Sidebar              │ │
+│ │                      │ │
+│ │ Analytics Layout     │ │
+│ │ ┌──────────────────┐ │ │
+│ │ │ Analytics Page   │ │ │
+│ │ └──────────────────┘ │ │
+│ └──────────────────────┘ │
+└──────────────────────────┘
+```
+
+---
+
+# Navigation Behavior
+
+Suppose you're on:
+
+```text
+/dashboard
+```
+
+and navigate to:
+
+```text
+/dashboard/analytics
+```
+
+### What remounts?
+
+```text
+RootLayout         ❌ stays mounted
+DashboardLayout    ❌ stays mounted
+AnalyticsPage      ✅ changes
+```
+
+If `analytics/layout.tsx` exists:
+
+```text
+AnalyticsLayout    ✅ mounts
+AnalyticsPage      ✅ mounts
+```
+
+---
+
+# State Persistence Example
+
+```tsx
+"use client";
+
+import { useState } from "react";
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [count, setCount] = useState(0);
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>
+        {count}
+      </button>
+
+      {children}
+    </>
+  );
+}
+```
+
+Click:
+
+```text
+Count: 10
+```
+
+Navigate:
+
+```text
+/dashboard
+→ /dashboard/analytics
+```
+
+Still:
+
+```text
+Count: 10
+```
+
+because `DashboardLayout` remains mounted.
+
+---
+
+# Metadata Inheritance
+
+Root layout:
+
+```tsx
+export const metadata = {
+  title: {
+    default: "My App",
+    template: "%s | My App",
+  },
+};
+```
+
+Analytics page:
+
+```tsx
+export const metadata = {
+  title: "Analytics",
+};
+```
+
+Result:
+
+```html
+<title>Analytics | My App</title>
+```
+
+Metadata flows through nested layouts.
+
+---
+
+# Error Handling in Nested Layouts
+
+Structure:
+
+```text
+dashboard/
+├── layout.tsx
+├── error.tsx
+└── analytics/
+    └── page.tsx
+```
+
+If Analytics page throws:
+
+```tsx
+throw new Error("Analytics crashed");
+```
+
+`dashboard/error.tsx` catches it.
+
+Error lookup:
+
+```text
+analytics/error.tsx ?
+       ↓
+dashboard/error.tsx ✅
+       ↓
+app/error.tsx
+```
+
+Nearest boundary wins.
+
+---
+
+# Interview Definition
+
+> Nested layouts are layouts defined at different route segments. Next.js composes them hierarchically, so parent layouts wrap child layouts and pages. They persist across navigation, allow shared UI at different levels of the application, and enable route-specific metadata, loading states, and error boundaries.
+
+
+
+
+
+---
+
+
+
+
+# `Multiple Root Layouts` :
+
+Multiple Root Layouts in Next.js are created using **Route Groups**.
+
+They allow different sections of your app to have completely different root layouts.
+
+---
+
+# Why Do We Need Multiple Root Layouts?
+
+Imagine a website with:
+
+### Public Site
+
+```text
+/
+about
+contact
+```
+
+Layout:
+
+```text
+Header
+Content
+Footer
+```
+
+---
+
+### Admin Dashboard
+
+```text
+/admin
+/admin/users
+/admin/settings
+```
+
+Layout:
+
+```text
+Sidebar
+Topbar
+Content
+```
+
+You don't want the public header/footer inside the admin section.
+
+---
+
+# Route Groups
+
+Create route groups using parentheses:
+
+```text
+(groupName)
+```
+
+Example:
+
+```text
+app/
+├── (marketing)/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── about/
+│       └── page.tsx
+│
+└── (admin)/
+    ├── layout.tsx
+    ├── admin/
+    │   └── page.tsx
+```
+
+Notice:
+
+```text
+(marketing)
+(admin)
+```
+
+These folders do **not** appear in the URL.
+
+---
+
+# URLs
+
+Structure:
+
+```text
+(marketing)/page.tsx
+```
+
+URL:
+
+```text
+/
+```
+
+Structure:
+
+```text
+(marketing)/about/page.tsx
+```
+
+URL:
+
+```text
+/about
+```
+
+Structure:
+
+```text
+(admin)/admin/page.tsx
+```
+
+URL:
+
+```text
+/admin
+```
+
+The route group name is ignored in the URL.
+
+---
+
+# Marketing Root Layout
+
+```tsx
+export default function MarketingLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html>
+      <body>
+        <header>Marketing Header</header>
+
+        {children}
+
+        <footer>Marketing Footer</footer>
+      </body>
+    </html>
+  );
+}
+```
+
+---
+
+# Admin Root Layout
+
+```tsx
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html>
+      <body>
+        <aside>Admin Sidebar</aside>
+
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+---
+
+# Result
+
+Visiting:
+
+```text
+/
+```
+
+Shows:
+
+```text
+Marketing Header
+
+Home Page
+
+Marketing Footer
+```
+
+---
+
+Visiting:
+
+```text
+/admin
+```
+
+Shows:
+
+```text
+Admin Sidebar
+
+Admin Dashboard
+```
+
+Completely different layout tree.
+
+---
+
+# Folder Structure for Multiple Root Layouts
+
+```text
+app/
+├── (shop)/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── products/
+│       └── page.tsx
+│
+└── (admin)/
+    ├── layout.tsx
+    └── dashboard/
+        └── page.tsx
+```
+
+Each group has its own root layout.
+
+---
+
+# Important Rule
+
+When using multiple root layouts, you typically **do not have a top-level `app/layout.tsx`**.
+
+Instead:
+
+```text
+app/
+├── (shop)/layout.tsx
+└── (admin)/layout.tsx
+```
+
+Each group becomes its own root layout.
+
+---
+
+# Full Page Reloads
+
+This is an important interview question.
+
+Navigate from:
+
+```text
+/
+```
+
+to:
+
+```text
+/admin
+```
+
+Next.js performs a **full page load**, not a client-side layout transition.
+
+Why?
+
+Because you're switching between two different root layout trees.
+
+```text
+Marketing Root Layout
+        ↓
+Admin Root Layout
+```
+
+The entire React tree changes.
+
+---
+
+# Root Layout vs Nested Layout
+
+### Nested Layout
+
+```text
+app/layout.tsx
+dashboard/layout.tsx
+```
+
+Navigation:
+
+```text
+/dashboard
+→ /dashboard/users
+```
+
+✅ Client-side transition
+✅ State preserved
+
+---
+
+### Multiple Root Layouts
+
+```text
+(marketing)/layout.tsx
+(admin)/layout.tsx
+```
+
+Navigation:
+
+```text
+/
+→ /admin
+```
+
+❌ Full page reload
+❌ State reset
+
+---
+
+# Real-World Example
+
+```text
+app/
+├── (public)/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── about/
+│       └── page.tsx
+│
+├── (auth)/
+│   ├── layout.tsx
+│   ├── login/
+│   │   └── page.tsx
+│   └── register/
+│       └── page.tsx
+│
+└── (admin)/
+    ├── layout.tsx
+    └── dashboard/
+        └── page.tsx
+```
+
+You can have:
+
+* Public website layout
+* Authentication layout
+* Admin dashboard layout
+
+all in the same Next.js application.
+
+---
+
+## Interview Answer
+
+> Multiple Root Layouts are created using Route Groups. Each route group contains its own `layout.tsx` and acts as an independent root layout. Route group names do not affect the URL. Navigating between different root layouts causes a full page reload because Next.js must switch between entirely different layout trees.
+
+
+
+
+
+---
+
+
+
+
+# Metadata :
+
+Routing and Metadata are closely related in the Next.js App Router because each route can define its own SEO metadata.
+
+---
+
+# What is Metadata?
+
+Metadata is information placed inside the HTML `<head>`.
+
+Examples:
+
+```html
+<title>About Us</title>
+
+<meta
+  name="description"
+  content="Learn more about us"
+/>
+```
+
+Used for:
+
+* SEO
+* Browser tab title
+* Social sharing
+* Search engine previews
+
+---
+
+# Static Metadata
+
+For a route:
+
+```text
+app/
+└── about/
+    └── page.tsx
+```
+
+```tsx
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About",
+  description: "About our company",
+};
+
+export default function About() {
+  return <h1>About Page</h1>;
+}
+```
+
+Visiting:
+
+```text
+/about
+```
+
+Produces:
+
+```html
+<title>About</title>
+
+<meta
+  name="description"
+  content="About our company"
+/>
+```
+
+---
+
+# Root Metadata
+
+In the root layout:
+
+```tsx
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: {
+    default: "My App",
+    template: "%s | My App",
+  },
+  description: "My Website",
+};
+```
+
+This metadata is inherited by routes.
+
+---
+
+# Metadata Templates
+
+Root layout:
+
+```tsx
+export const metadata = {
+  title: {
+    default: "My App",
+    template: "%s | My App",
+  },
+};
+```
+
+Page:
+
+```tsx
+export const metadata = {
+  title: "About",
+};
+```
+
+Result:
+
+```html
+<title>About | My App</title>
+```
+
+---
+
+# Dynamic Route Metadata
+
+Structure:
+
+```text
+app/
+└── blogs/
+    └── [id]/
+        └── page.tsx
+```
+
+URL:
+
+```text
+/blogs/5
+```
+
+Use `generateMetadata()`:
+
+```tsx
+import type { Metadata } from "next";
+
+type Props = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
+export async function generateMetadata(
+  { params }: Props
+): Promise<Metadata> {
+  const { id } = await params;
+
+  return {
+    title: `Blog ${id}`,
+  };
+}
+```
+
+Visiting:
+
+```text
+/blogs/5
+```
+
+Produces:
+
+```html
+<title>Blog 5</title>
+```
+
+---
+
+# Metadata with Data Fetching
+
+```tsx
+export async function generateMetadata(
+  { params }: Props
+): Promise<Metadata> {
+
+  const { id } = await params;
+
+  const blog = await fetch(
+    `https://api.example.com/blogs/${id}`
+  ).then((res) => res.json());
+
+  return {
+    title: blog.title,
+    description: blog.description,
+  };
+}
+```
+
+SEO data can come from a database or API.
+
+---
+
+# Nested Route Metadata
+
+Structure:
+
+```text
+app/
+├── layout.tsx
+└── dashboard/
+    ├── layout.tsx
+    └── analytics/
+        └── page.tsx
+```
+
+Metadata is merged from parent to child routes.
+
+Example:
+
+Root:
+
+```tsx
+export const metadata = {
+  title: {
+    default: "My App",
+    template: "%s | My App",
+  },
+};
+```
+
+Analytics page:
+
+```tsx
+export const metadata = {
+  title: "Analytics",
+};
+```
+
+Result:
+
+```html
+<title>Analytics | My App</title>
+```
+
+---
+
+# Absolute Titles
+
+Sometimes you don't want the template.
+
+```tsx
+export const metadata = {
+  title: {
+    absolute: "Login",
+  },
+};
+```
+
+Result:
+
+```html
+<title>Login</title>
+```
+
+Not:
+
+```html
+<title>Login | My App</title>
+```
+
+---
+
+# File-Based Metadata
+
+Next.js also supports special files.
+
+```text
+app/
+├── favicon.ico
+├── icon.png
+├── apple-icon.png
+└── opengraph-image.png
+```
+
+These automatically become metadata.
+
+Examples:
+
+* favicon
+* app icons
+* Open Graph images
+* Twitter images
+
+---
+
+# Metadata and Routing
+
+Think of each route having its own metadata.
+
+```text
+/                 → Home metadata
+/about            → About metadata
+/blogs            → Blogs metadata
+/blogs/1          → Blog 1 metadata
+/blogs/2          → Blog 2 metadata
+```
+
+When navigation occurs, Next.js updates the document head automatically.
+
+---
+
+# Static vs Dynamic Metadata
+
+### Static
+
+```tsx
+export const metadata = {
+  title: "About",
+};
+```
+
+Known at build time.
+
+---
+
+### Dynamic
+
+```tsx
+export async function generateMetadata() {
+  return {
+    title: "Blog 5",
+  };
+}
+```
+
+Computed at request/render time.
+
+---
+
+# Interview Answer
+
+> In the Next.js App Router, metadata is defined per route using either the `metadata` export for static metadata or `generateMetadata()` for dynamic metadata. Metadata is inherited and merged through nested layouts, allowing each route to customize titles, descriptions, Open Graph tags, and other SEO information while Next.js automatically updates the document head during navigation.
+
+
+
+
+
+---
+
+
+
+
+# `meta titie` :
+
+In the Next.js App Router (`app` directory), you can set the page title in two main ways.
+
+## Static Metadata
+
+For a fixed title:
+
+```tsx
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Blog Page",
+  description: "This is a blog page",
+};
+
+export default function Page() {
+  return <h1>Blog Page</h1>;
+}
+```
+
+---
+
+## Dynamic Metadata
+
+For dynamic routes such as `app/blog/[id]/page.tsx`:
+
+```tsx
+import type { Metadata } from "next";
+
+type PageProps = {
+  params: Promise<{ id: string }>;
+};
+
+export async function generateMetadata(
+  { params }: PageProps
+): Promise<Metadata> {
+  const { id } = await params;
+
+  return {
+    title: `Blog ${id}`,
+    description: `Viewing blog ${id}`,
+  };
+}
+
+export default async function BlogPage({ params }: PageProps) {
+  const { id } = await params;
+
+  return <h1>Blog {id}</h1>;
+}
+```
+
+When visiting:
+
+```
+/blog/1
+```
+
+the browser tab title becomes:
+
+```
+Blog 1
+```
+
+---
+
+## Global Title Template
+
+In `app/layout.tsx`:
+
+```tsx
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: {
+    default: "My Website",
+    template: "%s | My Website",
+  },
+};
+```
+
+Then a page with:
+
+```tsx
+export const metadata = {
+  title: "Blog",
+};
+```
+
+will render:
+
+```
+Blog | My Website
+```
+
+while pages without a title use:
+
+```
+My Website
+```
+
+This title is automatically inserted into the HTML `<title>` tag by Next.js, so you usually don't need to use `<Head>` manually in the App Router.
+
+
+
+
+
+---
+
+
+
+
+# `Global Title Template` :
+
+A **Global Title Template** in Next.js lets you define a consistent format for page titles across your entire application.
+
+Instead of manually writing:
+
+```text
+Home | My Website
+About | My Website
+Blog | My Website
+Contact | My Website
+```
+
+for every page, you define the format once in `app/layout.tsx`.
+
+---
+
+## Step 1: Configure the Template
+
+In your root layout:
+
+```tsx
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: {
+    default: "My Website",
+    template: "%s | My Website",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+### What does this mean?
+
+* `default`: Used when a page doesn't provide its own title.
+* `template`: Used when a page provides a title.
+* `%s`: Placeholder that gets replaced by the page title.
+
+---
+
+## Step 2: Define Titles in Pages
+
+### Home Page
+
+```tsx
+export const metadata = {
+  title: "Home",
+};
+
+export default function Home() {
+  return <h1>Home</h1>;
+}
+```
+
+Browser tab title:
+
+```text
+Home | My Website
+```
+
+---
+
+### About Page
+
+```tsx
+export const metadata = {
+  title: "About",
+};
+
+export default function About() {
+  return <h1>About</h1>;
+}
+```
+
+Browser tab title:
+
+```text
+About | My Website
+```
+
+---
+
+### Page Without a Title
+
+```tsx
+export default function Contact() {
+  return <h1>Contact</h1>;
+}
+```
+
+Browser tab title:
+
+```text
+My Website
+```
+
+because Next.js falls back to:
+
+```tsx
+default: "My Website"
+```
+
+---
+
+## Dynamic Pages
+
+For a blog route:
+
+```tsx
+import type { Metadata } from "next";
+
+type Props = {
+  params: Promise<{ id: string }>;
+};
+
+export async function generateMetadata(
+  { params }: Props
+): Promise<Metadata> {
+  const { id } = await params;
+
+  return {
+    title: `Blog ${id}`,
+  };
+}
+```
+
+For `/blog/5`, the final title becomes:
+
+```text
+Blog 5 | My Website
+```
+
+Next.js takes:
+
+```text
+Blog 5
+```
+
+and inserts it into:
+
+```text
+%s | My Website
+```
+
+---
+
+## Nested Layouts Can Have Their Own Templates
+
+You can also define a different template for a section of your app.
+
+Example:
+
+```tsx
+// app/admin/layout.tsx
+
+export const metadata = {
+  title: {
+    template: "%s | Admin Panel",
+  },
+};
+```
+
+Then:
+
+```tsx
+// app/admin/users/page.tsx
+
+export const metadata = {
+  title: "Users",
+};
+```
+
+Produces:
+
+```text
+Users | Admin Panel
+```
+
+instead of:
+
+```text
+Users | My Website
+```
+
+This is useful when different sections (Admin, Dashboard, Store, Blog) need their own branding.
+
+
+
+
+---
+
+
+
+# `meta title ` :
+
+If you're asking **what kinds of title metadata settings exist in Next.js**, there are several options beyond just a simple string.
+
+## 1. Simple Title
+
+```tsx
+export const metadata = {
+  title: "Home",
+};
+```
+
+Result:
+
+```html
+<title>Home</title>
+```
+
+---
+
+## 2. Default Title
+
+Used when a page doesn't specify its own title.
+
+```tsx
+export const metadata = {
+  title: {
+    default: "My Website",
+  },
+};
+```
+
+If a page has no title:
+
+```html
+<title>My Website</title>
+```
+
+---
+
+## 3. Template Title
+
+Adds a common suffix or prefix to all page titles.
+
+```tsx
+export const metadata = {
+  title: {
+    default: "My Website",
+    template: "%s | My Website",
+  },
+};
+```
+
+Page:
+
+```tsx
+export const metadata = {
+  title: "Blog",
+};
+```
+
+Result:
+
+```html
+<title>Blog | My Website</title>
+```
+
+Here `%s` is replaced with the page title.
+
+---
+
+## 4. Absolute Title
+
+Sometimes you want to ignore the parent layout template.
+
+```tsx
+export const metadata = {
+  title: {
+    absolute: "Login",
+  },
+};
+```
+
+Even if the root layout has:
+
+```tsx
+template: "%s | My Website"
+```
+
+the result will be:
+
+```html
+<title>Login</title>
+```
+
+not:
+
+```html
+<title>Login | My Website</title>
+```
+
+---
+
+## Hierarchy Example
+
+```tsx
+// app/layout.tsx
+export const metadata = {
+  title: {
+    default: "My Website",
+    template: "%s | My Website",
+  },
+};
+```
+
+### Page 1
+
+```tsx
+export const metadata = {
+  title: "About",
+};
+```
+
+Result:
+
+```html
+<title>About | My Website</title>
+```
+
+### Page 2
+
+```tsx
+export const metadata = {
+  title: {
+    absolute: "Login",
+  },
+};
+```
+
+Result:
+
+```html
+<title>Login</title>
+```
+
+### Page 3 (No title)
+
+```tsx
+export default function Page() {}
+```
+
+Result:
+
+```html
+<title>My Website</title>
+```
+
+### Summary
+
+| Type             | Purpose                           |        |
+| ---------------- | --------------------------------- | ------ |
+| `title: "Home"`  | Simple page title                 |        |
+| `title.default`  | Fallback title                    |        |
+| `title.template` | Common format (`%s                | Site`) |
+| `title.absolute` | Ignore parent template completely |        |
+
+These are the main title-related metadata configurations available in the Next.js App Router.
+
+
+
+
+
+
+---
+
+
+
+
+# `Link` :
+
+In Next.js, the **`Link` component** is used for client-side navigation between pages. It prevents a full page reload and makes navigation faster.
+
+## Basic Navigation
+
+```tsx id="xmkxvb"
+import Link from "next/link";
+
+export default function Home() {
+  return (
+    <div>
+      <Link href="/about">About Page</Link>
+    </div>
+  );
+}
+```
+
+When the user clicks the link, Next.js navigates to `/about` without reloading the browser.
+
+---
+
+## Navigation with Dynamic Routes
+
+Suppose you have:
+
+```text id="vkt0n0"
+app/
+ └─ blog/
+     └─ [id]/
+         └─ page.tsx
+```
+
+Navigate to a specific blog:
+
+```tsx id="7jmkpn"
+<Link href="/blog/1">Blog 1</Link>
+```
+
+Or dynamically:
+
+```tsx id="vjbf0t"
+const id = 5;
+
+<Link href={`/blog/${id}`}>Blog 5</Link>
+```
+
+---
+
+## Multiple Links
+
+```tsx id="qcdl7i"
+import Link from "next/link";
+
+export default function Header() {
+  return (
+    <nav>
+      <Link href="/">Home</Link>
+      <Link href="/about">About</Link>
+      <Link href="/contact">Contact</Link>
+    </nav>
+  );
+}
+```
+
+---
+
+## Styling Links
+
+```tsx id="b6r0rh"
+<Link
+  href="/about"
+  className="text-blue-500 hover:underline"
+>
+  About
+</Link>
+```
+
+---
+
+## Opening in a New Tab
+
+For external websites, use a normal anchor tag:
+
+```tsx id="i8w0xg"
+<a
+  href="https://example.com"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Visit Website
+</a>
+```
+
+`Link` is mainly intended for internal Next.js routes.
+
+---
+
+## Programmatic Navigation
+
+If navigation happens after a button click or form submission, use `useRouter()`.
+
+```tsx id="2spvgh"
+"use client";
+
+import { useRouter } from "next/navigation";
+
+export default function Page() {
+  const router = useRouter();
+
+  return (
+    <button onClick={() => router.push("/about")}>
+      Go to About
+    </button>
+  );
+}
+```
+
+Common methods:
+
+```tsx id="bd9hwz"
+router.push("/about");      // Navigate
+router.replace("/about");   // Replace current history entry
+router.back();              // Go back
+router.forward();           // Go forward
+router.refresh();           // Refresh server data
+```
+
+### When to Use What?
+
+| Situation                       | Use                                   |
+| ------------------------------- | ------------------------------------- |
+| Navigation via text/menu links  | `Link`                                |
+| Navigation after a button click | `router.push()`                       |
+| Redirect after form submission  | `router.push()` or `router.replace()` |
+| Dynamic URLs                    | `Link href={\`/blog/${id}`}`          |
+
+For most navigation in headers, sidebars, and menus, prefer **`Link`** because it gives Next.js prefetching and faster page transitions.
+
+
+
+
+
+---
+
+
+
+
+# `replace` :
+
+### `router.replace()` in Next.js
+
+`replace()` navigates to a new page **without adding a new entry to the browser history**.
+
+```tsx id="k0qjlwm"
+"use client";
+
+import { useRouter } from "next/navigation";
+
+export default function Page() {
+  const router = useRouter();
+
+  return (
+    <button onClick={() => router.replace("/dashboard")}>
+      Go to Dashboard
+    </button>
+  );
+}
+```
+
+---
+
+## Difference Between `push()` and `replace()`
+
+### `push()`
+
+```tsx id="6krvwea"
+router.push("/dashboard");
+```
+
+History:
+
+```text id="3ax7e0q"
+Home → Dashboard
+```
+
+Pressing the browser Back button:
+
+```text id="cqg56ca"
+Dashboard → Home
+```
+
+because a new history entry was added.
+
+---
+
+### `replace()`
+
+```tsx id="f6vww2j"
+router.replace("/dashboard");
+```
+
+History:
+
+```text id="jcc9g2f"
+Home (replaced by Dashboard)
+```
+
+Pressing Back:
+
+```text id="i04flzt"
+Does not return to Home
+```
+
+because the current entry was replaced.
+
+---
+
+## Common Use Cases
+
+### Login Redirect
+
+After login, users usually shouldn't go back to the login page.
+
+```tsx id="y7ljhpn"
+router.replace("/dashboard");
+```
+
+Instead of:
+
+```tsx id="6eb4vwi"
+router.push("/dashboard");
+```
+
+---
+
+### Redirecting Invalid URLs
+
+```tsx id="4y8k6hu"
+router.replace("/404");
+```
+
+---
+
+### Changing Query Parameters
+
+```tsx id="5s6vjlwm"
+router.replace("/products?page=2");
+```
+
+Updates the URL without cluttering browser history.
+
+---
+
+## Example
+
+```tsx id="6lmywhg"
+"use client";
+
+import { useRouter } from "next/navigation";
+
+export default function LoginPage() {
+  const router = useRouter();
+
+  const handleLogin = () => {
+    // login logic
+    router.replace("/dashboard");
+  };
+
+  return <button onClick={handleLogin}>Login</button>;
+}
+```
+
+After login:
+
+```text id="ifjlwmq"
+Login → Dashboard
+```
+
+and the user can't go back to the login page using the browser Back button.
+
+### Quick Summary
+
+| Method                     | Adds History Entry? | Back Button Returns? |
+| -------------------------- | ------------------- | -------------------- |
+| `router.push("/about")`    | ✅ Yes               | ✅ Yes                |
+| `router.replace("/about")` | ❌ No                | ❌ No                 |
+
+Use **`push()`** for normal navigation and **`replace()`** when the previous page should no longer be reachable through browser history.
+
+
+
+
+
+---
+
+
+
+
+# `active links` :
+
+An **active link** is a navigation link that looks different when the user is currently on that page.
+
+In the Next.js App Router, use `usePathname()` from `next/navigation`.
+
+### Example
+
+```tsx id="u9cl48"
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+export default function Header() {
+  const pathname = usePathname();
+
+  return (
+    <nav>
+      <Link
+        href="/"
+        className={pathname === "/" ? "text-red-500" : ""}
+      >
+        Home
+      </Link>
+
+      <Link
+        href="/about"
+        className={pathname === "/about" ? "text-red-500" : ""}
+      >
+        About
+      </Link>
+
+      <Link
+        href="/blogs"
+        className={pathname === "/blogs" ? "text-red-500" : ""}
+      >
+        Blogs
+      </Link>
+    </nav>
+  );
+}
+```
+
+When the URL is:
+
+```text
+/about
+```
+
+the About link gets the active class.
+
+---
+
+## Reusable Active Link Component
+
+```tsx id="s0j7i1"
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+type ActiveLinkProps = {
+  href: string;
+  children: React.ReactNode;
+};
+
+export default function ActiveLink({
+  href,
+  children,
+}: ActiveLinkProps) {
+  const pathname = usePathname();
+
+  const isActive = pathname === href;
+
+  return (
+    <Link
+      href={href}
+      className={isActive ? "font-bold text-blue-500" : ""}
+    >
+      {children}
+    </Link>
+  );
+}
+```
+
+Usage:
+
+```tsx id="l77ltj"
+<ActiveLink href="/">Home</ActiveLink>
+<ActiveLink href="/about">About</ActiveLink>
+<ActiveLink href="/blogs">Blogs</ActiveLink>
+```
+
+---
+
+## For Nested Routes
+
+If you're on:
+
+```text
+/blogs/1
+```
+
+and want the Blogs menu item to stay active:
+
+```tsx id="v3d0jv"
+const isActive = pathname.startsWith("/blogs");
+```
+
+Example:
+
+```tsx id="y3clcr"
+<Link
+  href="/blogs"
+  className={
+    pathname.startsWith("/blogs")
+      ? "text-blue-500 font-bold"
+      : ""
+  }
+>
+  Blogs
+</Link>
+```
+
+This will be active for:
+
+```text
+/blogs
+/blogs/1
+/blogs/2
+/blogs/100
+```
+
+which is often the desired behavior for navigation menus.
+
+
+
+
+---
+
+
+
+
+# `params and searchparams` :
+
+In Next.js App Router, **`params`** and **`searchParams`** are different things:
+
+| Feature     | `params`                 | `searchParams`       |
+| ----------- | ------------------------ | -------------------- |
+| Source      | Dynamic route segments   | Query string         |
+| URL Example | `/blogs/123`             | `/blogs?sort=latest` |
+| Value       | `{ id: "123" }`          | `{ sort: "latest" }` |
+| Defined By  | Folder names like `[id]` | URL query parameters |
+
+---
+
+## 1. `params`
+
+Used for **dynamic routes**.
+
+Folder structure:
+
+```text
+app/
+└── blogs/
+    └── [id]/
+        └── page.tsx
+```
+
+URL:
+
+```text
+/blogs/123
+```
+
+Page:
+
+```tsx
+type Props = {
+  params: Promise<{ id: string }>;
+};
+
+export default async function BlogPage({ params }: Props) {
+  const { id } = await params;
+
+  return <h1>Blog {id}</h1>;
+}
+```
+
+Result:
+
+```text
+Blog 123
+```
+
+Here:
+
+```tsx
+params = {
+  id: "123"
+}
+```
+
+---
+
+## 2. `searchParams`
+
+Used for query strings.
+
+URL:
+
+```text
+/blogs?sort=latest&page=2
+```
+
+Page:
+
+```tsx
+type Props = {
+  searchParams: Promise<{
+    sort?: string;
+    page?: string;
+  }>;
+};
+
+export default async function BlogsPage({
+  searchParams,
+}: Props) {
+  const { sort, page } = await searchParams;
+
+  return (
+    <>
+      <p>Sort: {sort}</p>
+      <p>Page: {page}</p>
+    </>
+  );
+}
+```
+
+Result:
+
+```text
+Sort: latest
+Page: 2
+```
+
+---
+
+## Using Both Together
+
+URL:
+
+```text
+/blogs/123?comment=true
+```
+
+Folder:
+
+```text
+app/blogs/[id]/page.tsx
+```
+
+Page:
+
+```tsx
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ comment?: string }>;
+};
+
+export default async function BlogPage({
+  params,
+  searchParams,
+}: Props) {
+  const { id } = await params;
+  const { comment } = await searchParams;
+
+  return (
+    <>
+      <h1>Blog {id}</h1>
+      <p>Comment Mode: {comment}</p>
+    </>
+  );
+}
+```
+
+For:
+
+```text
+/blogs/123?comment=true
+```
+
+you get:
+
+```tsx
+params = {
+  id: "123"
+}
+
+searchParams = {
+  comment: "true"
+}
+```
+
+---
+
+## Client Components
+
+In client components, use hooks instead.
+
+### Get route params
+
+```tsx
+"use client";
+
+import { useParams } from "next/navigation";
+
+export default function Page() {
+  const params = useParams();
+
+  return <p>{params.id}</p>;
+}
+```
+
+### Get query params
+
+```tsx
+"use client";
+
+import { useSearchParams } from "next/navigation";
+
+export default function Page() {
+  const searchParams = useSearchParams();
+
+  const sort = searchParams.get("sort");
+
+  return <p>{sort}</p>;
+}
+```
+
+---
+
+### Example URLs
+
+```text
+/blogs/10
+```
+
+```tsx
+params = { id: "10" }
+searchParams = {}
+```
+
+---
+
+```text
+/blogs/10?sort=latest
+```
+
+```tsx
+params = { id: "10" }
+searchParams = { sort: "latest" }
+```
+
+A simple way to remember it:
+
+* **`params` → comes from the path** (`/blogs/10`)
+* **`searchParams` → comes from the query string** (`?sort=latest&page=2`)
+
+
+
+
+
+---
+
+
+
+
+# `Programmatic navigation` :
+
+**Programmatic navigation** means navigating through code instead of clicking a `<Link>`.
+
+In Next.js App Router, use the `useRouter()` hook from `next/navigation`.
+
+---
+
+## Basic Example
+
+```tsx
+"use client";
+
+import { useRouter } from "next/navigation";
+
+export default function Home() {
+  const router = useRouter();
+
+  return (
+    <button onClick={() => router.push("/about")}>
+      Go to About
+    </button>
+  );
+}
+```
+
+When the button is clicked, the user is navigated to `/about`.
+
+---
+
+## `router.push()`
+
+Adds a new entry to browser history.
+
+```tsx
+router.push("/about");
+```
+
+History:
+
+```text
+Home → About
+```
+
+The browser Back button returns to Home.
+
+---
+
+## `router.replace()`
+
+Replaces the current history entry.
+
+```tsx
+router.replace("/dashboard");
+```
+
+History:
+
+```text
+Login → Dashboard
+```
+
+The Login page is replaced, so Back won't return to it.
+
+Common after login/logout flows.
+
+---
+
+## Dynamic Routes
+
+Navigate to a dynamic page:
+
+```tsx
+router.push(`/blogs/${id}`);
+```
+
+Example:
+
+```tsx
+const id = 5;
+
+router.push(`/blogs/${id}`);
+```
+
+Navigates to:
+
+```text
+/blogs/5
+```
+
+---
+
+## With Query Parameters
+
+```tsx
+router.push("/blogs?sort=latest&page=2");
+```
+
+Navigates to:
+
+```text
+/blogs?sort=latest&page=2
+```
+
+---
+
+## Go Back
+
+```tsx
+router.back();
+```
+
+Equivalent to clicking the browser Back button.
+
+---
+
+## Go Forward
+
+```tsx
+router.forward();
+```
+
+Equivalent to clicking the browser Forward button.
+
+---
+
+## Refresh Current Route
+
+```tsx
+router.refresh();
+```
+
+Refreshes the current route and re-fetches server data without a full browser reload.
+
+Useful when data has changed on the server.
+
+---
+
+## After Form Submission
+
+```tsx
+"use client";
+
+import { useRouter } from "next/navigation";
+
+export default function LoginForm() {
+  const router = useRouter();
+
+  const handleSubmit = async () => {
+    // login logic
+
+    router.replace("/dashboard");
+  };
+
+  return <button onClick={handleSubmit}>Login</button>;
+}
+```
+
+---
+
+## `Link` vs `router.push()`
+
+### Use `Link`
+
+```tsx
+<Link href="/about">About</Link>
+```
+
+For normal navigation menus, headers, sidebars, etc.
+
+### Use `router.push()`
+
+```tsx
+<button onClick={() => router.push("/about")}>
+  Go
+</button>
+```
+
+When navigation depends on user actions, API responses, form submissions, conditions, timers, etc.
+
+---
+
+### Summary
+
+| Method                    | Purpose                      |
+| ------------------------- | ---------------------------- |
+| `router.push("/page")`    | Navigate and keep history    |
+| `router.replace("/page")` | Navigate and replace history |
+| `router.back()`           | Go to previous page          |
+| `router.forward()`        | Go to next page              |
+| `router.refresh()`        | Re-fetch current route data  |
+
+`useRouter()` can only be used in **Client Components**, so the file must start with:
+
+```tsx
+"use client";
+```
+
+
+
+
+----
+
+
+
+
+# `template.tsx` :
+
+In Next.js App Router, a **`template.tsx`** is similar to a layout, but it behaves differently during navigation.
+
+## `layout.tsx` vs `template.tsx`
+
+### `layout.tsx`
+
+* Persists between route navigations.
+* Does **not remount** when moving between pages inside the same segment.
+* Preserves state.
+
+Example:
+
+```text
+app/
+├─ layout.tsx
+├─ about/page.tsx
+└─ contact/page.tsx
+```
+
+When navigating:
+
+```text
+/about → /contact
+```
+
+the layout stays mounted.
+
+---
+
+### `template.tsx`
+
+* Creates a **new instance** on every navigation.
+* Remounts each time a child page changes.
+* Resets state and reruns effects.
+
+Example:
+
+```text
+app/
+├─ template.tsx
+├─ about/page.tsx
+└─ contact/page.tsx
+```
+
+When navigating:
+
+```text
+/about → /contact
+```
+
+the template is recreated.
+
+---
+
+## Example
+
+### `app/template.tsx`
+
+```tsx
+export default function Template({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  console.log("Template Rendered");
+
+  return (
+    <div>
+      <h1>Template</h1>
+      {children}
+    </div>
+  );
+}
+```
+
+Every route change inside that segment causes the template to remount.
+
+---
+
+## Why Use a Template?
+
+A common use case is when you want animations or effects to restart on navigation.
+
+```tsx
+"use client";
+
+import { useEffect } from "react";
+
+export default function Template({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    console.log("Animation started");
+  }, []);
+
+  return <>{children}</>;
+}
+```
+
+Because the template remounts, the effect runs on every page navigation.
+
+With a layout, it would only run once.
+
+---
+
+## State Example
+
+### Layout
+
+```tsx
+"use client";
+
+import { useState } from "react";
+
+export default function Layout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [count, setCount] = useState(0);
+
+  return (
+    <>
+      <button onClick={() => setCount(count + 1)}>
+        {count}
+      </button>
+      {children}
+    </>
+  );
+}
+```
+
+Navigate between pages:
+
+```text
+/about → /contact
+```
+
+`count` is preserved.
+
+---
+
+### Template
+
+Put the same code in `template.tsx`.
+
+Navigate:
+
+```text
+/about → /contact
+```
+
+The component remounts and:
+
+```text
+count = 0
+```
+
+again.
+
+---
+
+## Route Hierarchy Example
+
+```text
+app/
+├─ layout.tsx
+├─ template.tsx
+├─ page.tsx
+├─ about/
+│  └─ page.tsx
+└─ blogs/
+   └─ page.tsx
+```
+
+Rendering order:
+
+```text
+layout
+ └─ template
+     └─ page
+```
+
+The layout persists.
+
+The template remounts when the page changes.
+
+---
+
+## When to Use Which?
+
+### Use `layout.tsx`
+
+* Navigation bars
+* Sidebars
+* Headers/footers
+* Shared state
+* Context providers
+* Anything that should persist
+
+### Use `template.tsx`
+
+* Page transition animations
+* Resetting component state on navigation
+* Re-running effects on every route change
+* Fresh instances for each page visit
+
+### Quick Rule
+
+* **Layout = persistent wrapper**
+* **Template = remounting wrapper**
+
+That's the core difference between `layout.tsx` and `template.tsx` in Next.js.
+
+
+
+
+---
+
+
+
+# `loading.tsx` :
+
+In Next.js App Router, a **Loading UI** is created using a special file named `loading.tsx`.
+
+### Folder Structure
+
+```text
+app/
+├── page.tsx
+├── loading.tsx
+└── about/
+    ├── page.tsx
+    └── loading.tsx
+```
+
+---
+
+### Root Loading UI
+
+`app/loading.tsx`
+
+```tsx
+export default function Loading() {
+  return <h2>Loading...</h2>;
+}
+```
+
+When a page in the `app` segment is loading, Next.js automatically shows this component.
+
+---
+
+### Example with Delayed Data
+
+`app/page.tsx`
+
+```tsx
+async function getData() {
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  return "Data Loaded";
+}
+
+export default async function Home() {
+  const data = await getData();
+
+  return <h1>{data}</h1>;
+}
+```
+
+While waiting 3 seconds, the user sees:
+
+```text
+Loading...
+```
+
+Then:
+
+```text
+Data Loaded
+```
+
+---
+
+### Route-Specific Loading
+
+You can also add a loading UI for a specific route:
+
+```text
+app/
+└── about/
+    ├── page.tsx
+    └── loading.tsx
+```
+
+`app/about/loading.tsx`
+
+```tsx
+export default function AboutLoading() {
+  return <h2>Loading About Page...</h2>;
+}
+```
+
+This loading UI appears only for the `/about` route segment.
+
+---
+
+### How It Works Internally
+
+When you navigate:
+
+```text
+Home → About
+```
+
+Next.js does something conceptually similar to:
+
+```tsx
+<Suspense fallback={<AboutLoading />}>
+  <AboutPage />
+</Suspense>
+```
+
+You don't have to write the `Suspense` yourself—Next.js automatically wires it up when it finds a `loading.tsx` file.
+
+---
+
+### Typical Loading UI
+
+Instead of plain text, many apps use skeletons:
+
+```tsx
+export default function Loading() {
+  return (
+    <div>
+      <div className="h-6 w-48 bg-gray-300 animate-pulse rounded mb-4" />
+      <div className="h-4 w-full bg-gray-300 animate-pulse rounded mb-2" />
+      <div className="h-4 w-full bg-gray-300 animate-pulse rounded" />
+    </div>
+  );
+}
+```
+
+This gives users immediate feedback while server data is loading.
+
+### Interview Definition
+
+> `loading.tsx` is a special Next.js App Router file that automatically displays a fallback UI while a route segment or its data is being loaded. Next.js wraps the segment in a React Suspense boundary and renders the loading component until the page is ready.
+
+
+
+
+
+---
+
+
+
+# `error.tsx` :
+
+In Next.js App Router, error handling is done with a special file called **`error.tsx`**.
+
+---
+
+## Folder Structure
+
+```text
+app/
+├── page.tsx
+├── error.tsx
+├── loading.tsx
+└── about/
+    ├── page.tsx
+    └── error.tsx
+```
+
+---
+
+## Root Error Handler
+
+`app/error.tsx`
+
+```tsx
+"use client";
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+
+      <p>{error.message}</p>
+
+      <button onClick={() => reset()}>
+        Try Again
+      </button>
+    </div>
+  );
+}
+```
+
+### Why `"use client"`?
+
+`error.tsx` must be a Client Component because:
+
+* It receives the error object.
+* It uses the `reset()` function.
+* Users can interact with it (retry button).
+
+---
+
+## Throwing an Error
+
+`app/about/page.tsx`
+
+```tsx
+export default function About() {
+  throw new Error("Database connection failed");
+
+  return <h1>About Page</h1>;
+}
+```
+
+Result:
+
+```text
+Something went wrong!
+Database connection failed
+[Try Again]
+```
+
+instead of a crash screen.
+
+---
+
+## Route-Specific Error Handling
+
+You can place an `error.tsx` inside a route segment:
+
+```text
+app/
+└── about/
+    ├── page.tsx
+    └── error.tsx
+```
+
+`app/about/error.tsx`
+
+```tsx
+"use client";
+
+export default function Error({
+  error,
+}: {
+  error: Error;
+}) {
+  return (
+    <div>
+      <h1>About Page Error</h1>
+      <p>{error.message}</p>
+    </div>
+  );
+}
+```
+
+This catches errors only within the `/about` segment.
+
+---
+
+## `reset()` Function
+
+Example:
+
+```tsx
+"use client";
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
+  return (
+    <div>
+      <h2>{error.message}</h2>
+
+      <button onClick={() => reset()}>
+        Retry
+      </button>
+    </div>
+  );
+}
+```
+
+When clicked:
+
+```tsx id="0jfwjv"
+reset();
+```
+
+Next.js tries to re-render the route segment.
+
+Think of it as:
+
+```tsx id="9h8nqf"
+// pseudo code
+reloadCurrentRoute();
+```
+
+without refreshing the entire browser page.
+
+---
+
+## Example with Random Error
+
+`app/about/page.tsx`
+
+```tsx
+export default function About() {
+  const random = Math.random();
+
+  if (random > 0.5) {
+    throw new Error("Random Error Occurred");
+  }
+
+  return <h1>About Page Loaded Successfully</h1>;
+}
+```
+
+Sometimes you'll see:
+
+```text
+About Page Loaded Successfully
+```
+
+Sometimes:
+
+```text
+Random Error Occurred
+[Retry]
+```
+
+Pressing Retry calls `reset()` and tries again.
+
+---
+
+## `error.tsx` vs `not-found.tsx`
+
+### Error
+
+```tsx
+throw new Error("Something broke");
+```
+
+Handled by:
+
+```text
+error.tsx
+```
+
+Example:
+
+```text
+Database Error
+API Error
+Unexpected Exception
+```
+
+---
+
+### Not Found
+
+```tsx
+import { notFound } from "next/navigation";
+
+notFound();
+```
+
+Handled by:
+
+```text
+not-found.tsx
+```
+
+Example:
+
+```text
+Blog ID doesn't exist
+Product not found
+User not found
+```
+
+---
+
+## Loading vs Error vs Not Found
+
+| Situation              | File Used       |
+| ---------------------- | --------------- |
+| Data is loading        | `loading.tsx`   |
+| Unexpected exception   | `error.tsx`     |
+| Resource doesn't exist | `not-found.tsx` |
+
+Example flow:
+
+```text
+User visits /blogs/101
+        │
+        ▼
+Loading...
+        │
+        ▼
+Check Blog ID
+        │
+ ┌──────┴──────┐
+ │             │
+Exists      Doesn't Exist
+ │             │
+ ▼             ▼
+Show Page   notFound()
+                │
+                ▼
+          not-found.tsx
+```
+
+If a database call crashes:
+
+```text
+Loading...
+     │
+     ▼
+throw Error()
+     │
+     ▼
+error.tsx
+```
+
+### Interview Answer
+
+> `error.tsx` is a special App Router file used to catch runtime errors in a route segment. It acts as a React Error Boundary, displays a fallback UI, receives the `error` object and a `reset()` function, and prevents the entire application from crashing when a route throws an exception.
+
+
+
+
+
+---
+
+
+
+# `handling errors in nested layouts` :
+
+Nested error handling is one of the nicest features of the App Router.
+
+Think of `error.tsx` as an **Error Boundary for a route segment**.
+
+---
+
+# Example Structure
+
+```text
+app/
+├── layout.tsx
+├── error.tsx
+├── page.tsx
+│
+└── dashboard/
+    ├── layout.tsx
+    ├── error.tsx
+    ├── page.tsx
+    │
+    └── analytics/
+        └── page.tsx
+```
+
+You now have:
+
+* Root Error Boundary → `app/error.tsx`
+* Dashboard Error Boundary → `app/dashboard/error.tsx`
+
+---
+
+# Visual Hierarchy
+
+```text
+Root Layout
+│
+├── Root Error Boundary
+│
+└── Dashboard Layout
+      │
+      ├── Dashboard Error Boundary
+      │
+      └── Analytics Page
+```
+
+---
+
+# Case 1: Error in Dashboard Page
+
+`app/dashboard/page.tsx`
+
+```tsx id="n1"
+export default function Dashboard() {
+  throw new Error("Dashboard crashed");
+}
+```
+
+Next.js looks for the nearest error boundary.
+
+It finds:
+
+```text
+app/dashboard/error.tsx
+```
+
+So only the dashboard section is replaced.
+
+### Result
+
+```text
+Root Layout
+│
+└── Dashboard Error UI
+```
+
+The root layout remains visible.
+
+---
+
+# Case 2: Error in Analytics Page
+
+`app/dashboard/analytics/page.tsx`
+
+```tsx id="n2"
+export default function Analytics() {
+  throw new Error("Analytics crashed");
+}
+```
+
+Next.js searches upward:
+
+```text
+analytics/
+    ❌ no error.tsx
+
+dashboard/
+    ✅ error.tsx found
+```
+
+So:
+
+```text
+dashboard/error.tsx
+```
+
+handles the error.
+
+---
+
+# Case 3: No Dashboard Error File
+
+Structure:
+
+```text
+app/
+├── error.tsx
+└── dashboard/
+    ├── page.tsx
+```
+
+Dashboard throws:
+
+```tsx id="n3"
+throw new Error("Dashboard crashed");
+```
+
+Search path:
+
+```text
+dashboard/
+   ❌ no error.tsx
+
+app/
+   ✅ error.tsx
+```
+
+Root error boundary catches it.
+
+---
+
+# Real Example
+
+## Root Error
+
+`app/error.tsx`
+
+```tsx id="n4"
+"use client";
+
+export default function Error({
+  error,
+}: {
+  error: Error;
+}) {
+  return (
+    <div>
+      <h1>Global Error</h1>
+      <p>{error.message}</p>
+    </div>
+  );
+}
+```
+
+---
+
+## Dashboard Error
+
+`app/dashboard/error.tsx`
+
+```tsx id="n5"
+"use client";
+
+export default function Error({
+  error,
+}: {
+  error: Error;
+}) {
+  return (
+    <div>
+      <h1>Dashboard Error</h1>
+      <p>{error.message}</p>
+    </div>
+  );
+}
+```
+
+---
+
+## Analytics Page
+
+`app/dashboard/analytics/page.tsx`
+
+```tsx id="n6"
+export default function Analytics() {
+  throw new Error("Analytics failed");
+}
+```
+
+Visit:
+
+```text
+/dashboard/analytics
+```
+
+Output:
+
+```text
+Dashboard Error
+
+Analytics failed
+```
+
+NOT:
+
+```text
+Global Error
+```
+
+because the nearest boundary wins.
+
+---
+
+# Error Boundary Bubbling
+
+Just like JavaScript event bubbling, errors bubble upward.
+
+```text
+analytics/page.tsx
+      │
+      ▼
+analytics/error.tsx ? ❌
+      │
+      ▼
+dashboard/error.tsx ? ✅
+      │
+      ▼
+STOP
+```
+
+If none exists:
+
+```text
+dashboard/error.tsx ? ❌
+      │
+      ▼
+app/error.tsx ? ✅
+```
+
+---
+
+# Layout Errors
+
+Suppose:
+
+`app/dashboard/layout.tsx`
+
+```tsx id="n7"
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  throw new Error("Layout crashed");
+
+  return <>{children}</>;
+}
+```
+
+Question:
+
+**Will `dashboard/error.tsx` catch it?**
+
+### No.
+
+A route segment's `error.tsx` catches errors in its children, not errors in the same layout that owns it.
+
+So:
+
+```text
+dashboard/layout.tsx
+```
+
+cannot be caught by:
+
+```text
+dashboard/error.tsx
+```
+
+The error bubbles to the parent boundary:
+
+```text
+app/error.tsx
+```
+
+---
+
+# Important Rule
+
+Given:
+
+```text
+dashboard/
+├── layout.tsx
+├── error.tsx
+└── page.tsx
+```
+
+### Error in page.tsx
+
+```text
+dashboard/error.tsx
+```
+
+handles it.
+
+### Error in layout.tsx
+
+```text
+app/error.tsx
+```
+
+handles it.
+
+Because the layout sits above its own error boundary.
+
+---
+
+# Test This Yourself
+
+### Structure
+
+```text
+app/
+├── error.tsx
+└── dashboard/
+    ├── layout.tsx
+    ├── error.tsx
+    └── page.tsx
+```
+
+### dashboard/layout.tsx
+
+```tsx id="n8"
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  throw new Error("Layout Error");
+
+  return <>{children}</>;
+}
+```
+
+### dashboard/error.tsx
+
+```tsx id="n9"
+"use client";
+
+export default function Error() {
+  return <h1>Dashboard Error</h1>;
+}
+```
+
+### app/error.tsx
+
+```tsx id="n10"
+"use client";
+
+export default function Error() {
+  return <h1>Global Error</h1>;
+}
+```
+
+Visit:
+
+```text
+/dashboard
+```
+
+You will see:
+
+```text
+Global Error
+```
+
+not:
+
+```text
+Dashboard Error
+```
+
+---
+
+# Interview Summary
+
+For a route:
+
+```text
+app/dashboard/analytics/page.tsx
+```
+
+Next.js catches errors using the **nearest parent `error.tsx`**.
+
+Search order:
+
+```text
+analytics/error.tsx
+      ↓
+dashboard/error.tsx
+      ↓
+app/error.tsx
+```
+
+The first one found handles the error.
+
+A layout's own `error.tsx` does **not** catch errors thrown inside that same layout; those errors are caught by the next parent error boundary.
+
+
+
+
+---
+
+
+
+# `handling errors in layouts` :
+
+This is a subtle but very important Next.js App Router concept.
+
+## How `error.tsx` and `layout.tsx` relate
+
+Consider:
+
+```text
+app/
+├── error.tsx
+└── dashboard/
+    ├── layout.tsx
+    ├── error.tsx
+    └── page.tsx
+```
+
+### Case 1: Error in `page.tsx`
+
+`app/dashboard/page.tsx`
+
+```tsx
+export default function DashboardPage() {
+  throw new Error("Page crashed");
+}
+```
+
+Result:
+
+```text
+dashboard/error.tsx
+```
+
+handles it.
+
+Reason:
+
+```text
+dashboard/layout.tsx
+    └── dashboard/error.tsx
+            └── dashboard/page.tsx
+```
+
+The page is a child of the error boundary.
+
+---
+
+## Case 2: Error in `layout.tsx`
+
+`app/dashboard/layout.tsx`
+
+```tsx
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  throw new Error("Layout crashed");
+
+  return <>{children}</>;
+}
+```
+
+Now many people expect:
+
+```text
+dashboard/error.tsx
+```
+
+to catch it.
+
+It does **not**.
+
+Instead:
+
+```text
+app/error.tsx
+```
+
+catches it.
+
+---
+
+## Why?
+
+Think of the render tree like this:
+
+```text
+app/layout.tsx
+│
+├── app/error.tsx
+│
+└── dashboard/layout.tsx
+      │
+      ├── dashboard/error.tsx
+      │
+      └── dashboard/page.tsx
+```
+
+The `dashboard/error.tsx` boundary is created **inside** the dashboard layout.
+
+If the layout itself crashes before rendering its children, the dashboard error boundary never gets a chance to mount.
+
+So Next.js looks for the next parent error boundary:
+
+```text
+dashboard/layout.tsx throws
+        ↓
+dashboard/error.tsx not mounted yet
+        ↓
+app/error.tsx catches
+```
+
+---
+
+# Easy Rule
+
+### Error thrown in:
+
+```text
+dashboard/page.tsx
+dashboard/loading.tsx
+dashboard/template.tsx
+dashboard/analytics/page.tsx
+```
+
+✅ Caught by:
+
+```text
+dashboard/error.tsx
+```
+
+---
+
+### Error thrown in:
+
+```text
+dashboard/layout.tsx
+```
+
+❌ Not caught by:
+
+```text
+dashboard/error.tsx
+```
+
+✅ Caught by:
+
+```text
+app/error.tsx
+```
+
+---
+
+# Test It Yourself
+
+### Structure
+
+```text
+app/
+├── error.tsx
+└── dashboard/
+    ├── layout.tsx
+    ├── error.tsx
+    └── page.tsx
+```
+
+### Root Error
+
+`app/error.tsx`
+
+```tsx
+"use client";
+
+export default function Error({
+  error,
+}: {
+  error: Error;
+}) {
+  return (
+    <div>
+      <h1>Global Error</h1>
+      <p>{error.message}</p>
+    </div>
+  );
+}
+```
+
+### Dashboard Error
+
+`app/dashboard/error.tsx`
+
+```tsx
+"use client";
+
+export default function Error({
+  error,
+}: {
+  error: Error;
+}) {
+  return (
+    <div>
+      <h1>Dashboard Error</h1>
+      <p>{error.message}</p>
+    </div>
+  );
+}
+```
+
+### Dashboard Layout
+
+```tsx
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  throw new Error("Dashboard Layout Failed");
+
+  return <>{children}</>;
+}
+```
+
+Visit:
+
+```text
+/dashboard
+```
+
+Output:
+
+```text
+Global Error
+Dashboard Layout Failed
+```
+
+You will **not** see:
+
+```text
+Dashboard Error
+```
+
+---
+
+# How to Handle Layout Errors Locally?
+
+Create a parent route group or parent segment with its own error boundary.
+
+Example:
+
+```text
+app/
+├── error.tsx
+└── (admin)/
+    ├── error.tsx
+    └── dashboard/
+        ├── layout.tsx
+        └── page.tsx
+```
+
+Now if `dashboard/layout.tsx` crashes:
+
+```text
+(admin)/error.tsx
+```
+
+can catch it, because it is a parent boundary.
+
+---
+
+## Interview Answer
+
+> A route segment's `error.tsx` catches errors from its child pages and nested segments, but it does not catch errors thrown inside its own `layout.tsx`. If a layout throws an error, the error bubbles to the nearest parent error boundary, because the segment's error boundary is rendered inside the layout and cannot catch failures that occur before it mounts.
+
+
+
+
+---
+
+
+
+
+# `global-error.tsx` :
+
+Exactly. For errors in the **root layout**, Next.js provides **`global-error.tsx`**.
+
+## Why `global-error.tsx` exists
+
+`app/error.tsx` cannot catch errors from `app/layout.tsx` because the root layout must render before `error.tsx` can be mounted.
+
+To handle errors that occur in the root layout or root template, Next.js uses:
+
+```text
+app/
+├── layout.tsx
+├── error.tsx
+└── global-error.tsx
+```
+
+---
+
+## Example
+
+### `app/layout.tsx`
+
+```tsx
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  throw new Error("Root layout crashed");
+
+  return (
+    <html>
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+### `app/global-error.tsx`
+
+```tsx
+"use client";
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
+  return (
+    <html>
+      <body>
+        <h1>Something went wrong!</h1>
+        <p>{error.message}</p>
+
+        <button onClick={() => reset()}>
+          Try Again
+        </button>
+      </body>
+    </html>
+  );
+}
+```
+
+Notice that `global-error.tsx` must include its own:
+
+```tsx
+<html>
+<body>
+```
+
+because it replaces the entire root layout.
+
+---
+
+## Difference Between `error.tsx` and `global-error.tsx`
+
+| File               | Catches                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| `error.tsx`        | Errors in pages, templates, and nested route segments                                    |
+| `global-error.tsx` | Errors in the root layout (`app/layout.tsx`) and errors that escape all other boundaries |
+
+---
+
+## Interview Answer
+
+> `app/error.tsx` does not catch errors thrown in `app/layout.tsx` because it is rendered inside the root layout. To handle root layout failures, Next.js provides `app/global-error.tsx`, which replaces the entire application UI and therefore must render its own `<html>` and `<body>` tags.
+
+
+
+
+---
+
+
+
+# `Parallel Routes` :
+
+Parallel Routes are one of the more advanced features in the Next.js App Router.
+
+They let you render **multiple route segments side-by-side in the same layout**, independently of each other.
+
+---
+
+# The Problem They Solve
+
+Imagine a dashboard:
+
+```text
+--------------------------------
+| Sidebar | Main Content       |
+|          |                   |
+|          |                   |
+--------------------------------
+```
+
+Without parallel routes, you'd usually render everything through a single page.
+
+But what if you want:
+
+* Sidebar to have its own navigation
+* Main content to change independently
+* Modal to open as a route
+* Different sections to load separately
+
+That's where Parallel Routes help.
+
+---
+
+# Slot Syntax (`@folder`)
+
+Parallel routes are created using folders that start with `@`.
+
+Example:
+
+```text
+app/
+└── dashboard/
+    ├── layout.tsx
+    ├── @analytics/
+    │   └── page.tsx
+    └── @team/
+        └── page.tsx
+```
+
+Notice:
+
+```text
+@analytics
+@team
+```
+
+These are called **slots**.
+
+---
+
+# Layout Receives Slots as Props
+
+`dashboard/layout.tsx`
+
+```tsx
+export default function DashboardLayout({
+  analytics,
+  team,
+}: {
+  analytics: React.ReactNode;
+  team: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div>{analytics}</div>
+      <div>{team}</div>
+    </div>
+  );
+}
+```
+
+Next.js automatically passes the slot content.
+
+---
+
+# Example
+
+### Analytics Page
+
+```tsx
+// app/dashboard/@analytics/page.tsx
+
+export default function Analytics() {
+  return <h1>Analytics Data</h1>;
+}
+```
+
+### Team Page
+
+```tsx
+// app/dashboard/@team/page.tsx
+
+export default function Team() {
+  return <h1>Team Members</h1>;
+}
+```
+
+Rendered:
+
+```text
+Analytics Data
+Team Members
+```
+
+Both appear simultaneously.
+
+---
+
+# Visual Structure
+
+```text
+app/
+└── dashboard/
+    ├── layout.tsx
+    ├── @analytics/
+    │   └── page.tsx
+    └── @team/
+        └── page.tsx
+```
+
+Layout:
+
+```tsx
+<div className="grid grid-cols-2">
+  <div>{analytics}</div>
+  <div>{team}</div>
+</div>
+```
+
+Output:
+
+```text
+----------------------------------
+| Analytics Data | Team Members |
+----------------------------------
+```
+
+---
+
+# `default.tsx`
+
+What happens if a slot doesn't have an active route?
+
+You provide a fallback:
+
+```text
+@analytics/
+└── default.tsx
+```
+
+```tsx
+export default function DefaultAnalytics() {
+  return <h1>No Analytics Selected</h1>;
+}
+```
+
+This is similar to a fallback UI for that slot.
+
+---
+
+# Parallel Routes + Loading
+
+Each slot can have its own loading state.
+
+```text
+@analytics/
+├── page.tsx
+└── loading.tsx
+
+@team/
+├── page.tsx
+└── loading.tsx
+```
+
+Analytics can load while Team is already visible.
+
+---
+
+# Parallel Routes + Error Handling
+
+Each slot can have its own error boundary.
+
+```text
+@analytics/
+├── page.tsx
+└── error.tsx
+```
+
+If Analytics crashes:
+
+```text
+Analytics Error
+```
+
+can show while Team remains visible.
+
+---
+
+# Most Common Real-World Use: Modals
+
+Structure:
+
+```text
+app/
+├── page.tsx
+└── @modal/
+    └── login/
+        └── page.tsx
+```
+
+URL:
+
+```text
+/login
+```
+
+Instead of navigating away, Next.js can render:
+
+```text
+Home Page
+    +
+Login Modal
+```
+
+using Parallel Routes and Intercepting Routes together.
+
+This is how many modern apps implement URL-driven modals.
+
+---
+
+# Important Rule
+
+A slot folder:
+
+```text
+@analytics
+```
+
+does **not** affect the URL.
+
+URL remains:
+
+```text
+/dashboard
+```
+
+not:
+
+```text
+/analytics
+```
+
+The `@` folders are layout slots, not URL segments.
+
+---
+
+# Interview Definition
+
+> Parallel Routes allow multiple pages or route segments to be rendered simultaneously within the same layout using named slots (`@folder`). The layout receives each slot as a prop, enabling independent loading, error handling, and rendering of different UI regions such as dashboards, sidebars, and modals.
+
+
+
+
+---
