@@ -6969,3 +6969,4457 @@ Root Layout
 
 Everything ultimately wraps the `page.tsx`, which is always the innermost route content.
 
+
+
+
+---
+
+
+
+
+# `Unmatched Parallel Route Slots` :
+
+This is one of the trickiest App Router concepts, so let's build it step by step.
+
+## First: What is a Parallel Route Slot?
+
+Suppose you have:
+
+```text
+app/
+└── dashboard/
+    ├── layout.tsx
+    ├── @team/
+    │   └── page.tsx
+    └── @analytics/
+        └── page.tsx
+```
+
+The layout receives both slots:
+
+```tsx
+export default function DashboardLayout({
+  team,
+  analytics,
+}: {
+  team: React.ReactNode;
+  analytics: React.ReactNode;
+}) {
+  return (
+    <>
+      <div>{team}</div>
+      <div>{analytics}</div>
+    </>
+  );
+}
+```
+
+Think of it as:
+
+```html
+<DashboardLayout>
+    <TeamSlot />
+    <AnalyticsSlot />
+</DashboardLayout>
+```
+
+---
+
+## What Happens During Normal Navigation?
+
+Next.js knows what content belongs in each slot.
+
+```text
+/dashboard
+```
+
+renders:
+
+```html
+<DashboardLayout>
+    <TeamPage />
+    <AnalyticsPage />
+</DashboardLayout>
+```
+
+Everything is matched.
+
+---
+
+# The Problem: Page Refresh
+
+Imagine you're on a route where only one slot is active.
+
+Example structure:
+
+```text
+app/
+└── dashboard/
+    ├── layout.tsx
+    ├── @team/
+    │   └── page.tsx
+    └── @analytics/
+        └── views/
+            └── page.tsx
+```
+
+You navigate to:
+
+```text
+/dashboard/views
+```
+
+The Analytics slot has content:
+
+```html
+<AnalyticsViewsPage />
+```
+
+But what should the Team slot show?
+
+After a full page refresh, Next.js only knows the URL:
+
+```text
+/dashboard/views
+```
+
+The URL does **not** tell Next.js what should be inside the Team slot.
+
+So the Team slot becomes **unmatched**.
+
+---
+
+## Unmatched Slot
+
+An unmatched slot means:
+
+> Next.js cannot determine what component should render in that parallel route slot for the current URL.
+
+Visual:
+
+```html
+<DashboardLayout>
+
+    <TeamSlot>
+        ????
+    </TeamSlot>
+
+    <AnalyticsSlot>
+        <AnalyticsViewsPage />
+    </AnalyticsSlot>
+
+</DashboardLayout>
+```
+
+The `????` is the unmatched slot.
+
+---
+
+## How Next.js Solves It
+
+Create:
+
+```text
+app/
+└── dashboard/
+    └── @team/
+        └── default.tsx
+```
+
+```tsx
+export default function Default() {
+  return <h2>Select a team</h2>;
+}
+```
+
+Now when the slot is unmatched:
+
+```html
+<DashboardLayout>
+
+    <TeamSlot>
+        <Default />
+    </TeamSlot>
+
+    <AnalyticsSlot>
+        <AnalyticsViewsPage />
+    </AnalyticsSlot>
+
+</DashboardLayout>
+```
+
+---
+
+## Why `default.tsx` Exists
+
+Its job is:
+
+> Provide fallback content when a parallel route slot has no matching route.
+
+Think:
+
+```text
+Slot matched?
+      │
+ ┌────┴────┐
+ │         │
+Yes        No
+ │         │
+ ▼         ▼
+page.tsx   default.tsx
+```
+
+---
+
+## Real Example: Dashboard
+
+Imagine:
+
+```text
+app/
+└── dashboard/
+    ├── layout.tsx
+    ├── @notifications/
+    │   ├── page.tsx
+    │   └── default.tsx
+    │
+    └── @revenue/
+        ├── page.tsx
+        └── default.tsx
+```
+
+Layout:
+
+```tsx
+export default function Layout({
+  notifications,
+  revenue,
+}: {
+  notifications: React.ReactNode;
+  revenue: React.ReactNode;
+}) {
+  return (
+    <>
+      {notifications}
+      {revenue}
+    </>
+  );
+}
+```
+
+Refreshing a URL may leave one slot without a matching route.
+
+Next.js then renders:
+
+```tsx
+@notifications/default.tsx
+```
+
+or
+
+```tsx
+@revenue/default.tsx
+```
+
+instead of crashing.
+
+---
+
+## Easy Mental Model
+
+Think of parallel slots as independent mini-pages:
+
+```html
+<Layout>
+
+    <SlotA />
+    <SlotB />
+    <SlotC />
+
+</Layout>
+```
+
+When Next.js can't determine what belongs in a slot:
+
+```html
+<SlotA />
+<SlotB />
+?????
+```
+
+it renders:
+
+```html
+<SlotA />
+<SlotB />
+<Default />
+```
+
+using that slot's `default.tsx`.
+
+---
+
+### One-Line Definition
+
+> An unmatched parallel route slot occurs when Next.js cannot determine what content should be rendered in a slot for the current URL (often after a refresh or direct navigation). In that case, Next.js renders the slot's `default.tsx` as fallback content.
+
+
+
+
+---
+
+
+
+
+# `conditional routes` :
+
+In Next.js, **"conditional routes"** is not an official routing feature like layouts or parallel routes. Usually people mean:
+
+> Showing or allowing different routes/pages based on a condition.
+
+For example:
+
+* User logged in → show Dashboard
+* User not logged in → show Login
+* Admin → access Admin page
+* Normal user → redirect elsewhere
+
+---
+
+## 1. Conditional Rendering Inside a Route
+
+```tsx id="cond1"
+export default function Dashboard() {
+  const isLoggedIn = true;
+
+  return (
+    <>
+      {isLoggedIn ? (
+        <h1>Dashboard</h1>
+      ) : (
+        <h1>Please Login</h1>
+      )}
+    </>
+  );
+}
+```
+
+URL:
+
+```text id="cond2"
+/dashboard
+```
+
+The route exists, but the content changes based on a condition.
+
+---
+
+## 2. Conditional Redirects
+
+Server Component:
+
+```tsx id="cond3"
+import { redirect } from "next/navigation";
+
+export default function Dashboard() {
+  const isLoggedIn = false;
+
+  if (!isLoggedIn) {
+    redirect("/login");
+  }
+
+  return <h1>Dashboard</h1>;
+}
+```
+
+Flow:
+
+```text id="cond4"
+/dashboard
+      │
+      ▼
+Logged In?
+   │
+ ┌─┴─┐
+ │   │
+Yes  No
+ │   │
+ ▼   ▼
+Dashboard  /login
+```
+
+---
+
+## 3. Role-Based Routes
+
+```tsx id="cond5"
+import { redirect } from "next/navigation";
+
+export default function AdminPage() {
+  const role = "user";
+
+  if (role !== "admin") {
+    redirect("/");
+  }
+
+  return <h1>Admin Panel</h1>;
+}
+```
+
+Only admins can access the route.
+
+---
+
+## 4. Middleware-Based Conditional Routing
+
+Using `middleware.ts`:
+
+```text id="cond6"
+middleware.ts
+```
+
+```ts id="cond7"
+import { NextResponse } from "next/server";
+
+export function middleware() {
+  const isLoggedIn = false;
+
+  if (!isLoggedIn) {
+    return NextResponse.redirect(
+      new URL("/login", request.url)
+    );
+  }
+}
+```
+
+Runs before the route is rendered.
+
+Flow:
+
+```text id="cond8"
+Request
+   │
+   ▼
+Middleware
+   │
+ ┌─┴─┐
+ │   │
+Allow Redirect
+ │      │
+ ▼      ▼
+Page   Login
+```
+
+---
+
+## 5. Conditional Route Groups
+
+Structure:
+
+```text id="cond9"
+app/
+├── (public)/
+│   ├── page.tsx
+│   └── about/
+│       └── page.tsx
+│
+└── (admin)/
+    └── admin/
+        └── page.tsx
+```
+
+You can conditionally allow access to the admin group using middleware or authentication checks.
+
+---
+
+## 6. Conditional Dynamic Routes
+
+```tsx id="cond10"
+import { notFound } from "next/navigation";
+
+export default async function Blog({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  if (Number(id) > 100) {
+    notFound();
+  }
+
+  return <h1>Blog {id}</h1>;
+}
+```
+
+Condition:
+
+```text id="cond11"
+id <= 100  → Show page
+id > 100   → 404
+```
+
+---
+
+## Mental Model
+
+```text id="cond12"
+User requests route
+        │
+        ▼
+   Condition Check
+        │
+   ┌────┼────┐
+   │    │    │
+   ▼    ▼    ▼
+Render Redirect 404
+Page    Page
+```
+
+### Common Interview Answer
+
+> Conditional routing in Next.js means controlling access or navigation based on conditions such as authentication, user roles, feature flags, or route parameters. It is typically implemented using conditional rendering, `redirect()`, `notFound()`, or `middleware.ts` rather than a dedicated routing feature called "conditional routes".
+
+
+
+
+---
+
+
+
+
+# `Intercepting Route` :
+
+**Intercepting Routes** are used when you want to:
+
+> Show a route's content **inside the current page** (often as a modal) instead of performing a full page navigation.
+
+This is one of the main use cases combined with **Parallel Routes**.
+
+---
+
+# Problem Without Intercepting Routes
+
+Suppose you have:
+
+```text
+/feed
+/photo/1
+```
+
+Normal navigation:
+
+```text
+/feed
+   │
+click photo
+   │
+   ▼
+/photo/1
+```
+
+The entire page changes.
+
+---
+
+# Desired Behavior
+
+You're on:
+
+```text
+/feed
+```
+
+and click a photo.
+
+Instead of leaving the feed:
+
+```html
+<FeedPage />
+
+<PhotoModal />
+```
+
+appears on top.
+
+URL becomes:
+
+```text
+/photo/1
+```
+
+but visually you're still on the feed page with a modal.
+
+---
+
+# Folder Structure
+
+Example:
+
+```text
+app/
+├── feed/
+│   └── page.tsx
+│
+├── photo/
+│   └── [id]/
+│       └── page.tsx
+│
+└── @modal/
+    └── (.)photo/
+        └── [id]/
+            └── page.tsx
+```
+
+Notice:
+
+```text
+(.)photo
+```
+
+This is an **intercepting route**.
+
+---
+
+# What Does `(.)` Mean?
+
+```text
+(.)      = same level
+(..)     = one level up
+(..)(..) = two levels up
+(...)    = from app root
+```
+
+Think of it like filesystem navigation:
+
+```text
+.   current folder
+..  parent folder
+```
+
+but applied to routes.
+
+---
+
+# Example Flow
+
+You are on:
+
+```text
+/feed
+```
+
+Click:
+
+```tsx
+<Link href="/photo/1">
+  Open Photo
+</Link>
+```
+
+---
+
+## Client Navigation
+
+Next.js intercepts:
+
+```text
+/photo/1
+```
+
+and renders:
+
+```html
+<FeedPage />
+
+<Modal>
+    <PhotoPage />
+</Modal>
+```
+
+URL:
+
+```text
+/photo/1
+```
+
+Page:
+
+```text
+Feed still visible
+Photo opens in modal
+```
+
+---
+
+## Browser Refresh
+
+Now refresh:
+
+```text
+/photo/1
+```
+
+Next.js cannot keep the previous `/feed` page.
+
+So it renders the real route:
+
+```text
+app/photo/[id]/page.tsx
+```
+
+Result:
+
+```html
+<PhotoPage />
+```
+
+Full page.
+
+---
+
+# Visual Comparison
+
+### Client Navigation
+
+```text
+/feed
+   │
+click photo
+   │
+   ▼
+/photo/1
+```
+
+Rendered:
+
+```html
+<FeedPage />
+
+<Modal>
+   <PhotoPage />
+</Modal>
+```
+
+---
+
+### Hard Refresh
+
+```text
+/photo/1
+```
+
+Rendered:
+
+```html
+<PhotoPage />
+```
+
+No modal.
+
+---
+
+# Why Use It?
+
+Common examples:
+
+### Instagram
+
+```text
+/feed
+```
+
+Click post:
+
+```text
+/post/123
+```
+
+Shows:
+
+```text
+Feed + Modal
+```
+
+Refresh:
+
+```text
+/post/123
+```
+
+Shows:
+
+```text
+Full Post Page
+```
+
+---
+
+### E-commerce
+
+```text
+/products
+```
+
+Click product:
+
+```text
+/product/10
+```
+
+Modal preview.
+
+Refresh:
+
+```text
+/product/10
+```
+
+Full product page.
+
+---
+
+# Intercepting Route Matchers
+
+### `(.)`
+
+Same level
+
+```text
+@modal/(.)photo/[id]
+```
+
+Intercept:
+
+```text
+photo/[id]
+```
+
+---
+
+### `(..)`
+
+One level up
+
+```text
+(..)settings
+```
+
+Intercept route from parent segment.
+
+---
+
+### `(..)(..)`
+
+Two levels up
+
+```text
+(..)(..)profile
+```
+
+Go up two segments.
+
+---
+
+### `(...)`
+
+From app root
+
+```text
+(...)login
+```
+
+Intercept:
+
+```text
+app/login
+```
+
+from anywhere.
+
+---
+
+# Typical Structure with Parallel Routes
+
+```text
+app/
+├── feed/
+│   └── page.tsx
+│
+├── photo/
+│   └── [id]/
+│       └── page.tsx
+│
+└── @modal/
+    ├── default.tsx
+    │
+    └── (.)photo/
+        └── [id]/
+            └── page.tsx
+```
+
+Hierarchy:
+
+```html
+<Layout>
+
+    <FeedPage />
+
+    <ModalSlot>
+        <PhotoModal />
+    </ModalSlot>
+
+</Layout>
+```
+
+---
+
+# Mental Model
+
+Normal route:
+
+```text
+/feed
+    ↓
+/photo/1
+```
+
+Intercepted route:
+
+```text
+/feed
+    ↓
+/photo/1
+
+Feed stays visible
+Photo appears in modal
+```
+
+---
+
+### One-Line Definition
+
+> Intercepting Routes allow Next.js to render a route inside the current UI context (commonly a modal) during client-side navigation, while still preserving the route's own URL and allowing it to render as a normal page on direct visits or refreshes.
+
+
+
+
+---
+
+
+
+
+Let's build the **smallest working Intercepting Routes example** so you can actually test it and see the difference.
+
+---
+
+# Goal
+
+We want:
+
+```text
+/feed
+```
+
+Show a list of photos.
+
+When clicking a photo:
+
+```text
+/photo/1
+```
+
+instead of leaving the feed page, open a modal.
+
+But if we refresh:
+
+```text
+/photo/1
+```
+
+we should see a full page.
+
+---
+
+# Step 1: Create Folder Structure
+
+```text
+app/
+│
+├── layout.tsx
+│
+├── feed/
+│   └── page.tsx
+│
+├── photo/
+│   └── [id]/
+│       └── page.tsx
+│
+└── @modal/
+    ├── default.tsx
+    │
+    └── (.)photo/
+        └── [id]/
+            └── page.tsx
+```
+
+---
+
+# Step 2: Root Layout
+
+`app/layout.tsx`
+
+```tsx
+export default function RootLayout({
+  children,
+  modal,
+}: {
+  children: React.ReactNode;
+  modal: React.ReactNode;
+}) {
+  return (
+    <html>
+      <body>
+        {children}
+
+        {modal}
+      </body>
+    </html>
+  );
+}
+```
+
+Notice:
+
+```tsx
+modal
+```
+
+comes from:
+
+```text
+@modal
+```
+
+slot.
+
+---
+
+# Step 3: Feed Page
+
+`app/feed/page.tsx`
+
+```tsx
+import Link from "next/link";
+
+export default function FeedPage() {
+  return (
+    <div>
+      <h1>Feed Page</h1>
+
+      <Link href="/photo/1">
+        Open Photo 1
+      </Link>
+    </div>
+  );
+}
+```
+
+---
+
+# Step 4: Real Photo Page
+
+`app/photo/[id]/page.tsx`
+
+```tsx
+export default async function PhotoPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  return (
+    <div>
+      <h1>FULL PAGE PHOTO {id}</h1>
+    </div>
+  );
+}
+```
+
+This is what appears on refresh/direct visit.
+
+---
+
+# Step 5: Default Modal
+
+`app/@modal/default.tsx`
+
+```tsx
+export default function Default() {
+  return null;
+}
+```
+
+Without this file, unmatched modal slots cause errors.
+
+---
+
+# Step 6: Intercepted Route
+
+`app/@modal/(.)photo/[id]/page.tsx`
+
+```tsx
+export default async function PhotoModal({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          padding: 20,
+          margin: "100px auto",
+          width: "300px",
+        }}
+      >
+        <h2>MODAL PHOTO {id}</h2>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+# What Happens?
+
+## Visit Feed
+
+```text
+/feed
+```
+
+Screen:
+
+```text
+Feed Page
+
+Open Photo 1
+```
+
+---
+
+## Click Link
+
+```text
+/photo/1
+```
+
+URL changes to:
+
+```text
+/photo/1
+```
+
+BUT screen becomes:
+
+```text
+Feed Page
+
++----------------+
+| MODAL PHOTO 1 |
++----------------+
+```
+
+Feed remains visible.
+
+---
+
+## Refresh Browser
+
+Press:
+
+```text
+F5
+```
+
+while on:
+
+```text
+/photo/1
+```
+
+Now Next.js loads:
+
+```text
+app/photo/[id]/page.tsx
+```
+
+Screen:
+
+```text
+FULL PAGE PHOTO 1
+```
+
+Modal disappears.
+
+---
+
+# Why?
+
+Because intercepting routes only work during:
+
+```text
+Client-side navigation
+```
+
+using:
+
+```tsx
+<Link />
+```
+
+or:
+
+```tsx
+router.push()
+```
+
+After refresh, Next.js only knows:
+
+```text
+/photo/1
+```
+
+so it renders the real route.
+
+---
+
+# Visual Flow
+
+### Normal Route
+
+```text
+/feed
+   │
+click
+   ▼
+/photo/1
+```
+
+renders:
+
+```text
+FULL PAGE PHOTO 1
+```
+
+---
+
+### Intercepted Route
+
+```text
+/feed
+   │
+click
+   ▼
+/photo/1
+```
+
+renders:
+
+```text
+Feed Page
+
+Modal Photo 1
+```
+
+---
+
+# What Does `(.)` Mean?
+
+```text
+(.)photo
+```
+
+means:
+
+> Intercept the route `photo` from the same level.
+
+Other matchers:
+
+```text
+(.)       same level
+(..)      parent level
+(..)(..)  two levels up
+(...)     root app folder
+```
+
+---
+
+# The One Thing to Remember
+
+Without intercepting routes:
+
+```text
+/feed
+  ↓
+/photo/1
+
+Feed disappears
+```
+
+With intercepting routes:
+
+```text
+/feed
+  ↓
+/photo/1
+
+Feed stays
+Photo opens as modal
+```
+
+That's the entire purpose of Intercepting Routes. They are mainly used for **modals, previews, drawers, and overlays** while keeping a shareable URL.
+
+
+
+
+---
+
+
+
+
+# `Route Handlers` :
+
+In **Next.js**, **Route Handlers** let you create backend API endpoints directly inside your application using the **App Router** (`app/` directory). They replace many use cases that were previously handled by API Routes in the Pages Router.
+
+## What are Route Handlers?
+
+A route handler is a file named `route.js` or `route.ts` inside the `app` directory that responds to HTTP requests.
+
+Example:
+
+```plaintext
+app/
+└── api/
+    └── users/
+        └── route.ts
+```
+
+```ts
+// app/api/users/route.ts
+
+export async function GET() {
+  return Response.json({
+    message: "Hello from Next.js Route Handler",
+  });
+}
+```
+
+Request:
+
+```http
+GET /api/users
+```
+
+Response:
+
+```json
+{
+  "message": "Hello from Next.js Route Handler"
+}
+```
+
+---
+
+## Supported HTTP Methods
+
+You can export functions matching HTTP methods:
+
+```ts
+export async function GET() {}
+export async function POST() {}
+export async function PUT() {}
+export async function PATCH() {}
+export async function DELETE() {}
+export async function HEAD() {}
+export async function OPTIONS() {}
+```
+
+Example:
+
+```ts
+export async function POST(request: Request) {
+  const body = await request.json();
+
+  return Response.json({
+    received: body,
+  });
+}
+```
+
+---
+
+## Reading Request Data
+
+### Query Parameters
+
+```ts
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+
+  const page = searchParams.get("page");
+
+  return Response.json({ page });
+}
+```
+
+Request:
+
+```http
+GET /api/users?page=2
+```
+
+Response:
+
+```json
+{
+  "page": "2"
+}
+```
+
+---
+
+### Request Body
+
+```ts
+export async function POST(request: Request) {
+  const body = await request.json();
+
+  return Response.json(body);
+}
+```
+
+For form data:
+
+```ts
+export async function POST(request: Request) {
+  const formData = await request.formData();
+
+  return Response.json({
+    name: formData.get("name"),
+  });
+}
+```
+
+---
+
+## Dynamic Route Handlers
+
+Create dynamic segments just like pages.
+
+Folder structure:
+
+```plaintext
+app/
+└── api/
+    └── users/
+        └── [id]/
+            └── route.ts
+```
+
+```ts
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  return Response.json({
+    userId: id,
+  });
+}
+```
+
+Request:
+
+```http
+GET /api/users/123
+```
+
+Response:
+
+```json
+{
+  "userId": "123"
+}
+```
+
+---
+
+## Returning Custom Status Codes
+
+```ts
+export async function GET() {
+  return Response.json(
+    { error: "Not Found" },
+    { status: 404 }
+  );
+}
+```
+
+Or:
+
+```ts
+return new Response("Unauthorized", {
+  status: 401,
+});
+```
+
+---
+
+## Using NextRequest and NextResponse
+
+Next.js provides enhanced request/response objects.
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+
+export async function GET(request: NextRequest) {
+  return NextResponse.json({
+    success: true,
+  });
+}
+```
+
+Benefits:
+
+* Cookie helpers
+* URL helpers
+* Redirect helpers
+* Rewrite helpers
+
+---
+
+## Working with Cookies
+
+### Read Cookies
+
+```ts
+import { cookies } from "next/headers";
+
+export async function GET() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token");
+
+  return Response.json({ token });
+}
+```
+
+### Set Cookies
+
+```ts
+import { NextResponse } from "next/server";
+
+export async function POST() {
+  const response = NextResponse.json({
+    success: true,
+  });
+
+  response.cookies.set("token", "abc123");
+
+  return response;
+}
+```
+
+---
+
+## Redirects
+
+```ts
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  return NextResponse.redirect(
+    new URL("/login", "http://localhost:3000")
+  );
+}
+```
+
+---
+
+## Access Headers
+
+```ts
+import { headers } from "next/headers";
+
+export async function GET() {
+  const headerStore = await headers();
+
+  return Response.json({
+    userAgent: headerStore.get("user-agent"),
+  });
+}
+```
+
+---
+
+## Route Parameters + Query Parameters
+
+```ts
+// /api/products/[id]?lang=en
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  const { searchParams } = new URL(request.url);
+
+  return Response.json({
+    id,
+    lang: searchParams.get("lang"),
+  });
+}
+```
+
+---
+
+## Edge Runtime
+
+Route handlers can run on the Edge Runtime.
+
+```ts
+export const runtime = "edge";
+
+export async function GET() {
+  return Response.json({
+    runtime: "edge",
+  });
+}
+```
+
+Advantages:
+
+* Lower latency
+* Global execution near users
+
+Limitations:
+
+* Not all Node.js APIs are available
+
+---
+
+## Database Example
+
+Using Prisma:
+
+```ts
+import { prisma } from "@/lib/prisma";
+
+export async function GET() {
+  const users = await prisma.user.findMany();
+
+  return Response.json(users);
+}
+```
+
+Create a user:
+
+```ts
+export async function POST(request: Request) {
+  const body = await request.json();
+
+  const user = await prisma.user.create({
+    data: {
+      name: body.name,
+      email: body.email,
+    },
+  });
+
+  return Response.json(user, {
+    status: 201,
+  });
+}
+```
+
+---
+
+## Route Handlers vs Server Actions
+
+| Route Handlers            | Server Actions                           |
+| ------------------------- | ---------------------------------------- |
+| Public HTTP endpoint      | Invoked from React components/forms      |
+| Used by external clients  | Usually internal application logic       |
+| Supports all HTTP methods | Typically form submissions and mutations |
+| Acts like a REST API      | Acts like a server-side function         |
+| Accessible via URL        | Not directly accessible via URL          |
+
+Use **Route Handlers** when:
+
+* Building APIs
+* Supporting mobile apps
+* Creating webhooks
+* Integrating third-party services
+* Exposing endpoints to external clients
+
+Use **Server Actions** when:
+
+* Handling form submissions
+* Performing internal mutations
+* Avoiding extra API layers between UI and server
+
+---
+
+## Common Folder Structure
+
+```plaintext
+app/
+├── api/
+│   ├── users/
+│   │   ├── route.ts
+│   │   └── [id]/
+│   │       └── route.ts
+│   └── auth/
+│       └── login/
+│           └── route.ts
+├── page.tsx
+└── layout.tsx
+```
+
+A common pattern in production is:
+
+```plaintext
+app/api/users/route.ts        // GET all users, POST create user
+app/api/users/[id]/route.ts   // GET, PUT, DELETE single user
+```
+
+This gives you a REST-style API while keeping frontend and backend code in the same Next.js project.
+
+
+
+
+
+---
+
+
+
+
+
+# `GET request` :
+
+A **GET request** in a Next.js Route Handler is used to **retrieve data** from the server.
+
+### Basic GET Route Handler
+
+```ts
+// app/api/users/route.ts
+
+export async function GET() {
+  return Response.json({
+    message: "Users fetched successfully",
+  });
+}
+```
+
+When you visit:
+
+```plaintext
+http://localhost:3000/api/users
+```
+
+Response:
+
+```json
+{
+  "message": "Users fetched successfully"
+}
+```
+
+---
+
+### GET Request with Query Parameters
+
+URL:
+
+```plaintext
+/api/users?page=1&limit=10
+```
+
+Route handler:
+
+```ts
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+
+  const page = searchParams.get("page");
+  const limit = searchParams.get("limit");
+
+  return Response.json({
+    page,
+    limit,
+  });
+}
+```
+
+Response:
+
+```json
+{
+  "page": "1",
+  "limit": "10"
+}
+```
+
+---
+
+### GET Request with Dynamic Route
+
+Folder structure:
+
+```plaintext
+app/
+└── api/
+    └── users/
+        └── [id]/
+            └── route.ts
+```
+
+```ts
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  return Response.json({
+    userId: id,
+  });
+}
+```
+
+Request:
+
+```plaintext
+/api/users/123
+```
+
+Response:
+
+```json
+{
+  "userId": "123"
+}
+```
+
+---
+
+### Fetching Data from a Database
+
+```ts
+import { prisma } from "@/lib/prisma";
+
+export async function GET() {
+  const users = await prisma.user.findMany();
+
+  return Response.json(users);
+}
+```
+
+---
+
+### Calling the GET API from a Client Component
+
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+
+export default function UsersPage() {
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    fetch("/api/users")
+      .then((res) => res.json())
+      .then((data) => setUsers(data));
+  }, []);
+
+  return (
+    <div>
+      {users.map((user: any) => (
+        <p key={user.id}>{user.name}</p>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+### Using `NextRequest`
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+
+export async function GET(request: NextRequest) {
+  const name = request.nextUrl.searchParams.get("name");
+
+  return NextResponse.json({
+    greeting: `Hello ${name}`,
+  });
+}
+```
+
+Request:
+
+```plaintext
+/api/users?name=John
+```
+
+Response:
+
+```json
+{
+  "greeting": "Hello John"
+}
+```
+
+### GET vs POST
+
+| GET                            | POST                      |
+| ------------------------------ | ------------------------- |
+| Retrieves data                 | Creates/sends data        |
+| Data sent via URL query params | Data sent in request body |
+| Should not modify data         | Usually modifies data     |
+| Can be cached                  | Typically not cached      |
+
+Example:
+
+```http
+GET /api/users
+```
+
+Fetches users.
+
+```http
+POST /api/users
+```
+
+Creates a new user.
+
+A common REST pattern is:
+
+```ts
+// GET all users
+GET /api/users
+
+// GET one user
+GET /api/users/123
+```
+
+where the `GET` handler only reads and returns data without changing anything on the server.
+
+
+
+
+
+---
+
+
+
+
+# `POST request` :
+
+A **POST request** in Next.js Route Handlers is used to **send data to the server**, typically for creating new records such as users, products, posts, etc.
+
+## Basic POST Route Handler
+
+```ts
+// app/api/users/route.ts
+
+export async function POST(request: Request) {
+  const body = await request.json();
+
+  return Response.json({
+    message: "User created",
+    data: body,
+  });
+}
+```
+
+### Client Request
+
+```js
+fetch("/api/users", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    name: "John",
+    email: "john@example.com",
+  }),
+});
+```
+
+### Response
+
+```json
+{
+  "message": "User created",
+  "data": {
+    "name": "John",
+    "email": "john@example.com"
+  }
+}
+```
+
+---
+
+## Creating a Database Record
+
+Using Prisma:
+
+```ts
+import { prisma } from "@/lib/prisma";
+
+export async function POST(request: Request) {
+  const body = await request.json();
+
+  const user = await prisma.user.create({
+    data: {
+      name: body.name,
+      email: body.email,
+    },
+  });
+
+  return Response.json(user, {
+    status: 201,
+  });
+}
+```
+
+`201 Created` is the standard status code for successful resource creation.
+
+---
+
+## Validation Example
+
+```ts
+export async function POST(request: Request) {
+  const body = await request.json();
+
+  if (!body.name) {
+    return Response.json(
+      { error: "Name is required" },
+      { status: 400 }
+    );
+  }
+
+  return Response.json(
+    { message: "Success" },
+    { status: 201 }
+  );
+}
+```
+
+---
+
+## Using NextRequest and NextResponse
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+
+  return NextResponse.json({
+    received: body,
+  });
+}
+```
+
+---
+
+## Handling Form Data
+
+HTML Form:
+
+```html
+<form method="POST">
+  <input name="name" />
+  <button type="submit">Submit</button>
+</form>
+```
+
+Route Handler:
+
+```ts
+export async function POST(request: Request) {
+  const formData = await request.formData();
+
+  const name = formData.get("name");
+
+  return Response.json({
+    name,
+  });
+}
+```
+
+---
+
+## GET and POST in the Same Route
+
+```ts
+// app/api/users/route.ts
+
+export async function GET() {
+  return Response.json({
+    message: "Get all users",
+  });
+}
+
+export async function POST(request: Request) {
+  const body = await request.json();
+
+  return Response.json({
+    message: "User created",
+    user: body,
+  });
+}
+```
+
+Now:
+
+```http
+GET /api/users
+```
+
+returns users, and
+
+```http
+POST /api/users
+```
+
+creates a new user.
+
+---
+
+## Real-World Example
+
+```ts
+// app/api/todos/route.ts
+
+let todos = [];
+
+export async function POST(request: Request) {
+  const todo = await request.json();
+
+  todos.push(todo);
+
+  return Response.json(
+    {
+      message: "Todo added",
+      todo,
+    },
+    {
+      status: 201,
+    }
+  );
+}
+```
+
+Client:
+
+```js
+await fetch("/api/todos", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    title: "Learn Next.js Route Handlers",
+  }),
+});
+```
+
+### HTTP Methods Quick Summary
+
+| Method | Purpose                      |
+| ------ | ---------------------------- |
+| GET    | Fetch data                   |
+| POST   | Create new data              |
+| PUT    | Replace existing data        |
+| PATCH  | Update part of existing data |
+| DELETE | Remove data                  |
+
+A common REST API structure is:
+
+```http
+GET    /api/users       -> Get all users
+GET    /api/users/1     -> Get user 1
+POST   /api/users       -> Create user
+PUT    /api/users/1     -> Replace user 1
+PATCH  /api/users/1     -> Update user 1
+DELETE /api/users/1     -> Delete user 1
+```
+
+
+
+
+
+---
+
+
+
+
+
+# `Dynamic Route Handlers` :
+
+**Dynamic Route Handlers** in Next.js allow you to create API endpoints with dynamic URL segments, similar to dynamic pages.
+
+## Folder Structure
+
+Suppose you want to handle requests like:
+
+```plaintext
+/api/users/123
+/api/users/456
+```
+
+Create:
+
+```plaintext
+app/
+└── api/
+    └── users/
+        └── [id]/
+            └── route.ts
+```
+
+Here, `[id]` is a dynamic segment.
+
+---
+
+## GET Example
+
+```ts
+// app/api/users/[id]/route.ts
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  return Response.json({
+    userId: id,
+  });
+}
+```
+
+Request:
+
+```http
+GET /api/users/123
+```
+
+Response:
+
+```json
+{
+  "userId": "123"
+}
+```
+
+---
+
+## Database Example
+
+```ts
+import { prisma } from "@/lib/prisma";
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id,
+    },
+  });
+
+  if (!user) {
+    return Response.json(
+      { error: "User not found" },
+      { status: 404 }
+    );
+  }
+
+  return Response.json(user);
+}
+```
+
+---
+
+## Dynamic POST Example
+
+Although POST is usually used on a collection route (`/api/users`), you can still access route parameters:
+
+```ts
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.json();
+
+  return Response.json({
+    userId: id,
+    data: body,
+  });
+}
+```
+
+---
+
+## Multiple Dynamic Segments
+
+Folder structure:
+
+```plaintext
+app/
+└── api/
+    └── users/
+        └── [userId]/
+            └── posts/
+                └── [postId]/
+                    └── route.ts
+```
+
+URL:
+
+```plaintext
+/api/users/10/posts/25
+```
+
+Handler:
+
+```ts
+export async function GET(
+  request: Request,
+  {
+    params,
+  }: {
+    params: Promise<{
+      userId: string;
+      postId: string;
+    }>;
+  }
+) {
+  const { userId, postId } = await params;
+
+  return Response.json({
+    userId,
+    postId,
+  });
+}
+```
+
+Response:
+
+```json
+{
+  "userId": "10",
+  "postId": "25"
+}
+```
+
+---
+
+## Catch-All Routes
+
+To match:
+
+```plaintext
+/api/docs/a
+/api/docs/a/b
+/api/docs/a/b/c
+```
+
+Use:
+
+```plaintext
+app/api/docs/[...slug]/route.ts
+```
+
+```ts
+export async function GET(
+  request: Request,
+  {
+    params,
+  }: {
+    params: Promise<{ slug: string[] }>;
+  }
+) {
+  const { slug } = await params;
+
+  return Response.json({
+    path: slug,
+  });
+}
+```
+
+Request:
+
+```http
+GET /api/docs/nextjs/routing/handlers
+```
+
+Response:
+
+```json
+{
+  "path": ["nextjs", "routing", "handlers"]
+}
+```
+
+---
+
+## Optional Catch-All Routes
+
+Folder:
+
+```plaintext
+app/api/docs/[[...slug]]/route.ts
+```
+
+Matches:
+
+```plaintext
+/api/docs
+/api/docs/a
+/api/docs/a/b
+```
+
+Handler:
+
+```ts
+export async function GET(
+  request: Request,
+  {
+    params,
+  }: {
+    params: Promise<{ slug?: string[] }>;
+  }
+) {
+  const { slug } = await params;
+
+  return Response.json({
+    slug,
+  });
+}
+```
+
+---
+
+## Dynamic Route + Query Parameters
+
+Request:
+
+```http
+GET /api/users/123?role=admin
+```
+
+```ts
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  const { searchParams } = new URL(request.url);
+
+  const role = searchParams.get("role");
+
+  return Response.json({
+    id,
+    role,
+  });
+}
+```
+
+Response:
+
+```json
+{
+  "id": "123",
+  "role": "admin"
+}
+```
+
+### Summary
+
+| Route Folder              | URL Example            | `params` Value                 |
+| ------------------------- | ---------------------- | ------------------------------ |
+| `[id]`                    | `/api/users/1`         | `{ id: "1" }`                  |
+| `[userId]/posts/[postId]` | `/api/users/1/posts/5` | `{ userId: "1", postId: "5" }` |
+| `[...slug]`               | `/api/docs/a/b`        | `{ slug: ["a", "b"] }`         |
+| `[[...slug]]`             | `/api/docs`            | `{ slug: undefined }`          |
+
+Dynamic route handlers are commonly used for resource-specific APIs such as:
+
+```plaintext
+/api/users/[id]
+/api/products/[id]
+/api/orders/[orderId]
+/api/blog/[slug]
+```
+
+where the route parameter identifies the specific resource being requested.
+
+
+
+
+---
+
+
+
+
+# `PATCH request` :
+
+A **PATCH request** in Next.js Route Handlers is used to **partially update an existing resource** (unlike PUT, which replaces the whole resource).
+
+---
+
+## Basic PATCH Route Handler
+
+Example: updating a user’s name or email.
+
+```ts
+// app/api/users/[id]/route.ts
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.json();
+
+  return Response.json({
+    message: "User updated partially",
+    userId: id,
+    updatedFields: body,
+  });
+}
+```
+
+---
+
+## Example Request
+
+```http
+PATCH /api/users/123
+Content-Type: application/json
+
+{
+  "name": "Updated Name"
+}
+```
+
+---
+
+## Example Response
+
+```json
+{
+  "message": "User updated partially",
+  "userId": "123",
+  "updatedFields": {
+    "name": "Updated Name"
+  }
+}
+```
+
+---
+
+## PATCH with Database (Prisma Example)
+
+```ts
+import { prisma } from "@/lib/prisma";
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.json();
+
+  const updatedUser = await prisma.user.update({
+    where: { id },
+    data: body, // only update provided fields
+  });
+
+  return Response.json(updatedUser);
+}
+```
+
+---
+
+## PATCH with Validation
+
+```ts
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.json();
+
+  if (!body || Object.keys(body).length === 0) {
+    return Response.json(
+      { error: "No fields provided to update" },
+      { status: 400 }
+    );
+  }
+
+  return Response.json({
+    message: "Valid update request",
+    id,
+    body,
+  });
+}
+```
+
+---
+
+## PATCH vs PUT
+
+| Feature | PATCH                         | PUT                      |
+| ------- | ----------------------------- | ------------------------ |
+| Purpose | Partial update                | Full replacement         |
+| Payload | Only changed fields           | Entire resource          |
+| Risk    | Low (updates selected fields) | Higher (overwrites data) |
+| Example | Update only `name`            | Replace full user object |
+
+---
+
+## Real-World Example
+
+### Updating a Todo Status
+
+```ts
+// app/api/todos/[id]/route.ts
+
+let todos = [
+  { id: "1", task: "Learn Next.js", done: false },
+];
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.json();
+
+  todos = todos.map((todo) =>
+    todo.id === id ? { ...todo, ...body } : todo
+  );
+
+  return Response.json({
+    message: "Todo updated",
+    todos,
+  });
+}
+```
+
+Request:
+
+```http
+PATCH /api/todos/1
+Content-Type: application/json
+
+{
+  "done": true
+}
+```
+
+Response:
+
+```json
+{
+  "message": "Todo updated",
+  "todos": [
+    {
+      "id": "1",
+      "task": "Learn Next.js",
+      "done": true
+    }
+  ]
+}
+```
+
+---
+
+## When to Use PATCH
+
+Use PATCH when:
+
+* You want to update **only specific fields**
+* You don’t want to send full object data
+* You are modifying existing records (e.g., profile update, status change)
+
+
+
+
+---
+
+
+
+
+# `DELETE request` :
+
+A **DELETE request** in Next.js Route Handlers is used to **remove a resource** from the server, such as deleting a user, post, or product.
+
+---
+
+## Basic DELETE Route Handler
+
+Example: deleting a user by ID
+
+```ts id="v7h8k2"
+// app/api/users/[id]/route.ts
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  return Response.json({
+    message: "User deleted successfully",
+    userId: id,
+  });
+}
+```
+
+---
+
+## Example Request
+
+```http id="kq3m9d"
+DELETE /api/users/123
+```
+
+No request body is usually needed.
+
+---
+
+## Example Response
+
+```json id="p1x8rt"
+{
+  "message": "User deleted successfully",
+  "userId": "123"
+}
+```
+
+---
+
+## DELETE with Database (Prisma Example)
+
+```ts id="z9wq2k"
+import { prisma } from "@/lib/prisma";
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  await prisma.user.delete({
+    where: { id },
+  });
+
+  return Response.json(
+    {
+      message: "User deleted",
+      id,
+    },
+    { status: 200 }
+  );
+}
+```
+
+---
+
+## DELETE with Error Handling
+
+```ts id="xk2p9a"
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  try {
+    const deleted = await prisma.user.delete({
+      where: { id },
+    });
+
+    return Response.json({
+      message: "Deleted successfully",
+      deleted,
+    });
+  } catch (error) {
+    return Response.json(
+      { error: "User not found or already deleted" },
+      { status: 404 }
+    );
+  }
+}
+```
+
+---
+
+## Client-Side DELETE Request
+
+```ts id="c7v2lm"
+await fetch("/api/users/123", {
+  method: "DELETE",
+});
+```
+
+---
+
+## Real-World Example: Delete Todo
+
+```ts id="q8n3sd"
+// app/api/todos/[id]/route.ts
+
+let todos = [
+  { id: "1", task: "Learn Next.js", done: false },
+  { id: "2", task: "Build API", done: true },
+];
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  todos = todos.filter((todo) => todo.id !== id);
+
+  return Response.json({
+    message: "Todo deleted",
+    todos,
+  });
+}
+```
+
+Request:
+
+```http id="h1k4pw"
+DELETE /api/todos/1
+```
+
+Response:
+
+```json id="r9d2ax"
+{
+  "message": "Todo deleted",
+  "todos": [
+    {
+      "id": "2",
+      "task": "Build API",
+      "done": true
+    }
+  ]
+}
+```
+
+---
+
+## DELETE vs Other Methods
+
+| Method | Purpose               |
+| ------ | --------------------- |
+| GET    | Read data             |
+| POST   | Create new data       |
+| PATCH  | Partially update data |
+| PUT    | Replace full data     |
+| DELETE | Remove data           |
+
+---
+
+## When to Use DELETE
+
+Use DELETE when:
+
+* Removing a user account
+* Deleting posts, comments, products
+* Clearing records from a database
+* Removing items from a list (cart, todo, etc.)
+
+---
+
+## Common REST Pattern
+
+```http id="m3x9ld"
+GET    /api/users        → fetch all users
+POST   /api/users        → create user
+GET    /api/users/123    → fetch single user
+PATCH  /api/users/123    → update user
+DELETE /api/users/123    → delete user
+```
+
+
+
+
+---
+
+
+
+
+# `URL query parameters` :
+
+**URL query parameters** are the part of a URL used to pass **optional data** to a route in the form of key–value pairs.
+
+They come after the `?` in a URL.
+
+---
+
+## Basic Example
+
+```plaintext
+/api/users?page=2&limit=10
+```
+
+Here:
+
+* `page = 2`
+* `limit = 10`
+
+These are called **query parameters**.
+
+---
+
+## Reading Query Parameters in Next.js Route Handlers
+
+In **Next.js App Router (Route Handlers)**, you read query params using `request.url`.
+
+### Example
+
+```ts id="q1x8ab"
+// app/api/users/route.ts
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+
+  const page = searchParams.get("page");
+  const limit = searchParams.get("limit");
+
+  return Response.json({
+    page,
+    limit,
+  });
+}
+```
+
+---
+
+## Request Example
+
+```http id="k2v9mn"
+GET /api/users?page=1&limit=5
+```
+
+---
+
+## Response Example
+
+```json id="z8x3qp"
+{
+  "page": "1",
+  "limit": "5"
+}
+```
+
+👉 Note: Query parameters are always returned as **strings**.
+
+---
+
+## Using Query Params with Default Values
+
+```ts id="d4m2kl"
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+
+  const page = searchParams.get("page") || "1";
+  const limit = searchParams.get("limit") || "10";
+
+  return Response.json({
+    page,
+    limit,
+  });
+}
+```
+
+---
+
+## Converting Query Params to Numbers
+
+```ts id="p9r2sd"
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+
+  const page = Number(searchParams.get("page") || 1);
+  const limit = Number(searchParams.get("limit") || 10);
+
+  return Response.json({
+    page,
+    limit,
+  });
+}
+```
+
+---
+
+## Using `NextRequest` (Cleaner Way)
+
+```ts id="n8k3lm"
+import { NextRequest, NextResponse } from "next/server";
+
+export async function GET(request: NextRequest) {
+  const page = request.nextUrl.searchParams.get("page");
+  const search = request.nextUrl.searchParams.get("search");
+
+  return NextResponse.json({
+    page,
+    search,
+  });
+}
+```
+
+---
+
+## Real-World Example: Filtering Users
+
+```ts id="f2x9pq"
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+
+  const role = searchParams.get("role");
+  const active = searchParams.get("active");
+
+  let users = [
+    { id: 1, name: "A", role: "admin", active: true },
+    { id: 2, name: "B", role: "user", active: false },
+  ];
+
+  if (role) {
+    users = users.filter((u) => u.role === role);
+  }
+
+  if (active) {
+    users = users.filter((u) => String(u.active) === active);
+  }
+
+  return Response.json(users);
+}
+```
+
+---
+
+## Common Use Cases
+
+Query parameters are used for:
+
+* Pagination (`page`, `limit`)
+* Searching (`search=phone`)
+* Filtering (`role=admin`)
+* Sorting (`sort=asc`)
+* Feature flags (`debug=true`)
+
+---
+
+## Query Params vs Route Params
+
+| Type         | Example             | Purpose                    |
+| ------------ | ------------------- | -------------------------- |
+| Query Params | `/api/users?page=1` | Optional filters/settings  |
+| Route Params | `/api/users/123`    | Identify specific resource |
+
+---
+
+## Summary
+
+* Appear after `?` in URL
+* Format: `key=value&key2=value2`
+* Read using `new URL(request.url).searchParams`
+* Always strings (convert if needed)
+* Used for filtering, pagination, searching
+
+---
+
+If you want, I can next explain **how query params work in Next.js pages (useSearchParams hook in client components)** or give a **real API pagination example with database**.
+
+
+
+
+
+---
+
+
+
+
+
+# `headers in route handlers` :
+
+In **Next.js Route Handlers**, **headers** are used to read and send metadata about the HTTP request/response (like auth tokens, content type, user agent, etc.).
+
+They are very important for things like **authentication, caching, and API communication**.
+
+---
+
+# 1. Reading Request Headers
+
+## Option 1: Using `headers()` (Recommended in App Router)
+
+```ts id="a1b2c3"
+import { headers } from "next/headers";
+
+export async function GET() {
+  const headerStore = await headers();
+
+  const userAgent = headerStore.get("user-agent");
+  const auth = headerStore.get("authorization");
+
+  return Response.json({
+    userAgent,
+    auth,
+  });
+}
+```
+
+---
+
+## Option 2: Using `NextRequest`
+
+```ts id="d4e5f6"
+import { NextRequest, NextResponse } from "next/server";
+
+export async function GET(request: NextRequest) {
+  const auth = request.headers.get("authorization");
+
+  return NextResponse.json({
+    auth,
+  });
+}
+```
+
+---
+
+# 2. Common Request Headers
+
+| Header          | Purpose                             |
+| --------------- | ----------------------------------- |
+| `authorization` | Auth token (JWT, Bearer token)      |
+| `content-type`  | Type of data sent (JSON, form-data) |
+| `user-agent`    | Browser/device info                 |
+| `cookie`        | Stored cookies                      |
+| `accept`        | Expected response format            |
+
+---
+
+# 3. Example: Authentication Header
+
+```ts id="g7h8i9"
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization");
+
+  if (!authHeader) {
+    return Response.json(
+      { error: "No token provided" },
+      { status: 401 }
+    );
+  }
+
+  return Response.json({
+    message: "Authenticated",
+  });
+}
+```
+
+---
+
+# 4. Sending Custom Response Headers
+
+## Using `Response`
+
+```ts id="j1k2l3"
+export async function GET() {
+  return new Response("Hello", {
+    headers: {
+      "x-custom-header": "my-value",
+    },
+  });
+}
+```
+
+---
+
+## Using `NextResponse`
+
+```ts id="m4n5o6"
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  const response = NextResponse.json({
+    message: "Success",
+  });
+
+  response.headers.set("x-powered-by", "Next.js");
+
+  return response;
+}
+```
+
+---
+
+# 5. Setting Common Response Headers
+
+## Content-Type
+
+```ts id="p7q8r9"
+export async function GET() {
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+}
+```
+
+---
+
+## CORS Headers (Important for APIs)
+
+```ts id="s1t2u3"
+export async function GET() {
+  return new Response("OK", {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST",
+    },
+  });
+}
+```
+
+---
+
+# 6. Real-World Example: Token Check + Response Header
+
+```ts id="v4w5x6"
+import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  const token = request.headers.get("authorization");
+
+  if (token !== "my-secret-token") {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  const response = NextResponse.json({
+    message: "Access granted",
+  });
+
+  response.headers.set("x-auth-status", "valid");
+
+  return response;
+}
+```
+
+---
+
+# 7. Headers vs Query Params vs Body
+
+| Type         | Used for                             |
+| ------------ | ------------------------------------ |
+| Headers      | Metadata (auth, device info, tokens) |
+| Query Params | Filtering & search (`?page=1`)       |
+| Body         | Actual data (POST, PATCH content)    |
+
+---
+
+# 8. When to Use Headers
+
+Use headers for:
+
+* Authentication (`Bearer token`)
+* API keys
+* Device/browser info
+* Content negotiation
+* CORS configuration
+* Custom metadata
+
+---
+
+# Summary
+
+* Read headers using `headers()` or `request.headers`
+* Set response headers using `Response` or `NextResponse`
+* Common use case: authentication and API control
+* Headers carry **metadata**, not main data
+
+
+
+
+---
+
+
+
+
+
+# `cookies in route handlers` :
+
+In **Next.js Route Handlers**, **cookies** let you store small pieces of data on the client and read/write them on the server (like authentication tokens, preferences, sessions).
+
+They are commonly used for **login sessions, JWT storage, and user settings**.
+
+---
+
+# 1. Reading Cookies (Server-side)
+
+## Using `cookies()` (App Router recommended)
+
+```ts id="a1b2c3"
+import { cookies } from "next/headers";
+
+export async function GET() {
+  const cookieStore = await cookies();
+
+  const token = cookieStore.get("token");
+
+  return Response.json({
+    token: token?.value || null,
+  });
+}
+```
+
+---
+
+## Example Request Cookie
+
+```http id="k9m2pq"
+Cookie: token=abc123
+```
+
+---
+
+# 2. Setting Cookies
+
+## Using `NextResponse`
+
+```ts id="x7y8z9"
+import { NextResponse } from "next/server";
+
+export async function POST() {
+  const response = NextResponse.json({
+    message: "Cookie set",
+  });
+
+  response.cookies.set("token", "abc123");
+
+  return response;
+}
+```
+
+---
+
+## Cookie Options (Important)
+
+```ts id="m2n3o4"
+response.cookies.set("token", "abc123", {
+  httpOnly: true,      // cannot be accessed by JS (secure)
+  secure: true,        // only HTTPS
+  path: "/",           // available site-wide
+  maxAge: 60 * 60,     // 1 hour
+});
+```
+
+---
+
+# 3. Deleting Cookies
+
+```ts id="p5q6r7"
+import { NextResponse } from "next/server";
+
+export async function POST() {
+  const response = NextResponse.json({
+    message: "Logged out",
+  });
+
+  response.cookies.delete("token");
+
+  return response;
+}
+```
+
+---
+
+# 4. Reading Cookies in Route Handler (Alternative way)
+
+```ts id="s8t9u0"
+export async function GET(request: Request) {
+  const cookieHeader = request.headers.get("cookie");
+
+  return Response.json({
+    cookies: cookieHeader,
+  });
+}
+```
+
+(Manual parsing needed here, so `cookies()` is preferred.)
+
+---
+
+# 5. Real-World Example: Login API
+
+## POST login → set cookie
+
+```ts id="v1w2x3"
+import { NextResponse } from "next/server";
+
+export async function POST(request: Request) {
+  const body = await request.json();
+
+  // fake authentication
+  if (body.email === "test@example.com") {
+    const response = NextResponse.json({
+      message: "Login successful",
+    });
+
+    response.cookies.set("token", "secure-jwt-token", {
+      httpOnly: true,
+      path: "/",
+      maxAge: 60 * 60 * 24, // 1 day
+    });
+
+    return response;
+  }
+
+  return NextResponse.json(
+    { error: "Invalid credentials" },
+    { status: 401 }
+  );
+}
+```
+
+---
+
+## GET protected route → read cookie
+
+```ts id="y4z5a6"
+import { cookies } from "next/headers";
+
+export async function GET() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token");
+
+  if (!token) {
+    return Response.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  return Response.json({
+    message: "Protected data access granted",
+  });
+}
+```
+
+---
+
+# 6. Cookie vs Local Storage
+
+| Feature              | Cookies         | Local Storage |
+| -------------------- | --------------- | ------------- |
+| Accessible on server | ✅ Yes           | ❌ No          |
+| Secure (httpOnly)    | ✅ Yes           | ❌ No          |
+| Sent with requests   | ✅ Automatically | ❌ No          |
+| Storage size         | Small (~4KB)    | Larger        |
+
+👉 Cookies are better for **auth/session management**.
+
+---
+
+# 7. Important Cookie Flags
+
+| Flag       | Meaning                     |
+| ---------- | --------------------------- |
+| `httpOnly` | Prevents JS access (secure) |
+| `secure`   | Works only on HTTPS         |
+| `sameSite` | Prevents CSRF attacks       |
+| `maxAge`   | Expiry time                 |
+
+Example:
+
+```ts id="b7c8d9"
+response.cookies.set("token", "abc123", {
+  httpOnly: true,
+  secure: true,
+  sameSite: "lax",
+  path: "/",
+});
+```
+
+---
+
+# 8. Summary
+
+* Use `cookies()` to **read cookies**
+* Use `NextResponse.cookies.set()` to **set cookies**
+* Use `.delete()` to remove cookies
+* Best for authentication and sessions
+* Safer than localStorage for sensitive data
+
+
+
+
+
+---
+
+
+
+
+
+# `redirects in route handlers` :
+
+In **Next.js Route Handlers**, **redirects** let you send the user (or client) to another URL from the server side. This is commonly used after login, form submission, authentication checks, or API flows.
+
+---
+
+# 1. Basic Redirect using `NextResponse.redirect()`
+
+```ts id="a1b2c3"
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  return NextResponse.redirect(new URL("/login", "http://localhost:3000"));
+}
+```
+
+👉 When user hits this route, they are redirected to `/login`.
+
+---
+
+# 2. Redirect using Request URL (Dynamic-safe way)
+
+This is the **recommended approach** because it works in production automatically.
+
+```ts id="d4e5f6"
+import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  const url = new URL("/dashboard", request.url);
+
+  return NextResponse.redirect(url);
+}
+```
+
+---
+
+# 3. Redirect after POST (Very Common Use Case)
+
+Example: after form submission or login
+
+```ts id="g7h8i9"
+import { NextResponse } from "next/server";
+
+export async function POST(request: Request) {
+  const body = await request.json();
+
+  if (body.email === "test@example.com") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  return NextResponse.json(
+    { error: "Invalid credentials" },
+    { status: 401 }
+  );
+}
+```
+
+---
+
+# 4. Redirect with External URL
+
+You can also redirect outside your app:
+
+```ts id="j1k2l3"
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  return NextResponse.redirect("https://google.com");
+}
+```
+
+---
+
+# 5. Redirect with Status Codes
+
+You can control redirect type:
+
+| Code | Meaning                      |
+| ---- | ---------------------------- |
+| 307  | Temporary redirect (default) |
+| 308  | Permanent redirect           |
+
+```ts id="m4n5o6"
+return NextResponse.redirect(
+  new URL("/new-page", request.url),
+  308
+);
+```
+
+---
+
+# 6. Authentication Redirect Example
+
+```ts id="p7q8r9"
+import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  const token = request.headers.get("authorization");
+
+  if (!token) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  return NextResponse.json({
+    message: "You are authenticated",
+  });
+}
+```
+
+---
+
+# 7. Redirect with Cookies (Login Flow)
+
+```ts id="s1t2u3"
+import { NextResponse } from "next/server";
+
+export async function POST(request: Request) {
+  const response = NextResponse.redirect(
+    new URL("/dashboard", request.url)
+  );
+
+  response.cookies.set("token", "abc123", {
+    httpOnly: true,
+    path: "/",
+  });
+
+  return response;
+}
+```
+
+---
+
+# 8. Redirect vs Rewrite
+
+| Feature                       | Redirect          | Rewrite                    |
+| ----------------------------- | ----------------- | -------------------------- |
+| URL changes in browser        | ✅ Yes             | ❌ No                       |
+| Server handles route silently | ❌ No              | ✅ Yes                      |
+| SEO impact                    | Yes               | No                         |
+| Use case                      | login, navigation | proxying, internal routing |
+
+---
+
+# 9. Real-World Example: Protected Route
+
+```ts id="v9w0x1"
+import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  const token = request.cookies.get("token");
+
+  if (!token) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  return NextResponse.json({
+    message: "Welcome to dashboard",
+  });
+}
+```
+
+---
+
+# 10. Summary
+
+* Use `NextResponse.redirect()` in Route Handlers
+* Always prefer `new URL(path, request.url)` for safety
+* Common use cases:
+
+  * Login → dashboard
+  * Auth protection
+  * Form submission flow
+* Default status: `307 Temporary Redirect`
+
+
+
+
+
+---
+
+
+
+
+
+# `caching in route handlers` :
+
+In **Next.js Route Handlers**, **caching** controls whether responses from your API routes are stored and reused instead of being recomputed on every request. It’s important for **performance, speed, and reducing database load**.
+
+---
+
+# 1. Default Caching Behavior
+
+In **Route Handlers (`app/api/.../route.ts`)**:
+
+* **GET requests are cacheable by default in some cases (especially with fetch caching)**
+* But most API Route Handlers behave as **dynamic (no cache)** unless you explicitly opt in
+
+So in practice:
+
+> Route Handlers are usually **not cached unless you configure them**
+
+---
+
+# 2. Force No Cache (Dynamic Response)
+
+Use this when data must always be fresh.
+
+```ts id="a1b2c3"
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  return Response.json({
+    time: new Date().toISOString(),
+  });
+}
+```
+
+👉 Every request runs fresh.
+
+---
+
+# 3. Force Static (Enable Caching)
+
+Use when data rarely changes.
+
+```ts id="d4e5f6"
+export const dynamic = "force-static";
+
+export async function GET() {
+  return Response.json({
+    message: "Static data",
+  });
+}
+```
+
+👉 Next.js may cache this response.
+
+---
+
+# 4. Revalidate (ISR-style caching)
+
+This is the most practical caching option.
+
+```ts id="g7h8i9"
+export const revalidate = 60; // seconds
+
+export async function GET() {
+  return Response.json({
+    time: new Date().toISOString(),
+  });
+}
+```
+
+### How it works:
+
+* Cached for 60 seconds
+* After that, Next.js regenerates it on next request
+
+---
+
+# 5. Per-Request Cache Control Headers
+
+You can control caching like traditional HTTP APIs.
+
+```ts id="j1k2l3"
+export async function GET() {
+  return new Response(JSON.stringify({ hello: "world" }), {
+    headers: {
+      "Cache-Control": "public, max-age=60",
+    },
+  });
+}
+```
+
+### Common Cache-Control values:
+
+| Value        | Meaning                |
+| ------------ | ---------------------- |
+| `no-store`   | Never cache            |
+| `no-cache`   | Always revalidate      |
+| `public`     | Cache allowed anywhere |
+| `max-age=60` | Cache for 60 seconds   |
+
+---
+
+# 6. Disable Caching Completely
+
+```ts id="m4n5o6"
+export async function GET() {
+  return new Response(JSON.stringify({ time: Date.now() }), {
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
+}
+```
+
+👉 Always fetch fresh data.
+
+---
+
+# 7. Fetch-level Caching inside Route Handlers
+
+If you call external APIs:
+
+```ts id="p7q8r9"
+export async function GET() {
+  const res = await fetch("https://api.example.com/data", {
+    next: {
+      revalidate: 60,
+    },
+  });
+
+  const data = await res.json();
+
+  return Response.json(data);
+}
+```
+
+👉 This caches the **fetch result**, not the route itself.
+
+---
+
+# 8. Tags-based Caching (Advanced)
+
+Useful for invalidating groups of data.
+
+### Fetch with tag:
+
+```ts id="s1t2u3"
+await fetch("https://api.example.com/users", {
+  next: {
+    tags: ["users"],
+  },
+});
+```
+
+### Revalidate manually:
+
+```ts id="v4w5x6"
+import { revalidateTag } from "next/cache";
+
+export async function POST() {
+  revalidateTag("users");
+
+  return Response.json({ message: "Cache cleared" });
+}
+```
+
+---
+
+# 9. Real-World Example: Cached Users API
+
+```ts id="y7z8a9"
+export const revalidate = 30;
+
+export async function GET() {
+  const users = [
+    { id: 1, name: "A" },
+    { id: 2, name: "B" },
+  ];
+
+  return Response.json(users);
+}
+```
+
+👉 Cached for 30 seconds → good for dashboards.
+
+---
+
+# 10. When to Use What
+
+| Scenario                           | Best Choice                  |
+| ---------------------------------- | ---------------------------- |
+| Live data (auth, dashboard stats)  | `no-store` / `force-dynamic` |
+| Semi-static data (blogs, products) | `revalidate = 60`            |
+| Rarely changing data               | `force-static`               |
+| External API optimization          | fetch `revalidate` + tags    |
+
+---
+
+# 11. Key Mental Model
+
+Think of caching in Route Handlers as 3 layers:
+
+1. **Route-level caching** (`dynamic`, `revalidate`)
+2. **HTTP caching** (`Cache-Control`)
+3. **Fetch caching** (`next.revalidate`, `tags`)
+
+---
+
+# Summary
+
+* Route Handlers are dynamic by default
+* Use `revalidate` for controlled caching
+* Use `no-store` for always-fresh data
+* Use fetch-level caching for external APIs
+* Use tags for smart invalidation
+
+
+
+
+
+---
+
+
+
+
+
+# `Middleware` :
+
+In **Next.js**, **Middleware** is code that runs **before a request is completed**, allowing you to **intercept, modify, or redirect requests**.
+
+It’s commonly used for:
+
+* Authentication checks
+* Redirects
+* Route protection
+* Localization
+* Logging
+* A/B testing
+
+---
+
+# 1. Where Middleware lives
+
+You create a file at the project root:
+
+```plaintext id="a1b2c3"
+middleware.ts
+```
+
+---
+
+# 2. Basic Middleware Example
+
+```ts id="d4e5f6"
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+export function middleware(request: NextRequest) {
+  return NextResponse.next();
+}
+```
+
+👉 This simply allows all requests through.
+
+---
+
+# 3. Redirect Example (Very Common)
+
+Redirect users from `/` to `/login`
+
+```ts id="g7h8i9"
+import { NextResponse } from "next/server";
+
+export function middleware(request: NextRequest) {
+  const url = request.nextUrl;
+
+  if (url.pathname === "/") {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  return NextResponse.next();
+}
+```
+
+---
+
+# 4. Protect Routes (Authentication Example)
+
+```ts id="j1k2l3"
+import { NextResponse } from "next/server";
+
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get("token")?.value;
+
+  const isProtectedRoute = request.nextUrl.pathname.startsWith("/dashboard");
+
+  if (isProtectedRoute && !token) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  return NextResponse.next();
+}
+```
+
+👉 This protects `/dashboard` routes.
+
+---
+
+# 5. Middleware Matching (Config)
+
+You can control which routes run middleware using `config`.
+
+```ts id="m4n5o6"
+export const config = {
+  matcher: ["/dashboard/:path*", "/profile/:path*"],
+};
+```
+
+👉 Middleware only runs for:
+
+* `/dashboard`
+* `/dashboard/settings`
+* `/profile`
+* etc.
+
+---
+
+# 6. Modifying Requests
+
+You can add headers before request continues.
+
+```ts id="p7q8r9"
+import { NextResponse } from "next/server";
+
+export function middleware(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-custom-header", "hello");
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+}
+```
+
+---
+
+# 7. Locale-based Routing Example
+
+Redirect users based on language
+
+```ts id="s1t2u3"
+export function middleware(request: NextRequest) {
+  const locale = request.headers.get("accept-language");
+
+  if (locale?.startsWith("fr")) {
+    return NextResponse.redirect(new URL("/fr", request.url));
+  }
+
+  return NextResponse.next();
+}
+```
+
+---
+
+# 8. Logging Requests
+
+```ts id="v4w5x6"
+export function middleware(request: NextRequest) {
+  console.log("Request made to:", request.nextUrl.pathname);
+
+  return NextResponse.next();
+}
+```
+
+---
+
+# 9. Middleware vs Route Handler
+
+| Feature                    | Middleware      | Route Handler |
+| -------------------------- | --------------- | ------------- |
+| Runs before request        | ✅               | ❌             |
+| Access to request/response | Limited         | Full          |
+| Modify response body       | ❌               | ✅             |
+| Use case                   | auth, redirects | API logic     |
+| Runs on Edge               | ✅               | Optional      |
+
+---
+
+# 10. Real-World Auth Flow
+
+```ts id="y7z8a9"
+import { NextResponse } from "next/server";
+
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get("token")?.value;
+
+  const isAuthPage = request.nextUrl.pathname === "/login";
+  const isDashboard = request.nextUrl.pathname.startsWith("/dashboard");
+
+  // Redirect logged-in users away from login
+  if (isAuthPage && token) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Protect dashboard
+  if (isDashboard && !token) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  return NextResponse.next();
+}
+```
+
+---
+
+# 11. Key Concepts to Remember
+
+* Middleware runs **before route handlers**
+* It runs on the **Edge runtime (fast, global)**
+* It cannot access database directly (no Node APIs)
+* It can:
+
+  * redirect
+  * rewrite
+  * modify headers
+  * block requests
+
+---
+
+# 12. Common Use Cases
+
+* 🔐 Authentication protection
+* 🌍 Localization routing
+* 🚦 A/B testing
+* 🧭 Redirect old URLs
+* 🧾 Request logging
+* 🛡 Security headers injection
+
+---
+
+# Summary
+
+Middleware is your **request gatekeeper**:
+
+> It decides what happens BEFORE your API or page runs.
+
+
+
+
+
+---
+
+
+
+
+
+# `rendering` :
+
+In **Next.js**, **rendering** means how and when your UI (pages/components) is generated and sent to the browser. It controls whether content is built **on the server, at build time, or in the browser**.
+
+Next.js supports several rendering strategies.
+
+---
+
+# 1. Client-Side Rendering (CSR)
+
+### What it means:
+
+The page is rendered **in the browser using JavaScript**.
+
+### Example:
+
+```tsx id="a1b2c3"
+"use client";
+
+import { useEffect, useState } from "react";
+
+export default function Page() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/users")
+      .then((res) => res.json())
+      .then(setData);
+  }, []);
+
+  return <div>{JSON.stringify(data)}</div>;
+}
+```
+
+### How it works:
+
+* Browser loads empty page
+* JavaScript runs
+* Data is fetched
+* UI appears
+
+### Pros:
+
+* Interactive apps
+* Good for dashboards
+
+### Cons:
+
+* Slower initial load
+* Bad SEO for content pages
+
+---
+
+# 2. Server-Side Rendering (SSR)
+
+### What it means:
+
+Page is rendered **on the server for every request**.
+
+### In App Router:
+
+```tsx id="d4e5f6"
+export default async function Page() {
+  const res = await fetch("https://api.example.com/users", {
+    cache: "no-store",
+  });
+
+  const data = await res.json();
+
+  return <div>{JSON.stringify(data)}</div>;
+}
+```
+
+### How it works:
+
+* Request comes in
+* Server fetches data
+* HTML is generated
+* Sent to browser
+
+### Pros:
+
+* Good SEO
+* Always fresh data
+
+### Cons:
+
+* Slower than static
+* Server load increases
+
+---
+
+# 3. Static Site Generation (SSG)
+
+### What it means:
+
+Page is generated **once at build time**.
+
+### Example:
+
+```tsx id="g7h8i9"
+export default async function Page() {
+  const res = await fetch("https://api.example.com/users", {
+    cache: "force-cache",
+  });
+
+  const data = await res.json();
+
+  return <div>{JSON.stringify(data)}</div>;
+}
+```
+
+### How it works:
+
+* Built during `next build`
+* Served as static HTML
+
+### Pros:
+
+* Very fast
+* CDN-friendly
+* Great SEO
+
+### Cons:
+
+* Data may become outdated
+
+---
+
+# 4. Incremental Static Regeneration (ISR)
+
+### What it means:
+
+Static pages that **update after a time interval**.
+
+```tsx id="j1k2l3"
+export const revalidate = 60;
+
+export default async function Page() {
+  const res = await fetch("https://api.example.com/users");
+  const data = await res.json();
+
+  return <div>{JSON.stringify(data)}</div>;
+}
+```
+
+### How it works:
+
+* Page is cached
+* After 60 seconds → regenerates in background
+
+### Pros:
+
+* Fast + fresh balance
+* Great for blogs/products
+
+---
+
+# 5. Rendering in App Router (Modern Next.js)
+
+Next.js decides rendering automatically based on caching:
+
+| Fetch Option        | Rendering Type |
+| ------------------- | -------------- |
+| `cache: "no-store"` | SSR            |
+| `force-cache`       | SSG            |
+| `revalidate`        | ISR            |
+
+---
+
+# 6. Server Components vs Client Components
+
+## Server Component (default)
+
+```tsx id="m4n5o6"
+export default async function Page() {
+  return <h1>Server Rendered</h1>;
+}
+```
+
+* Runs on server
+* No hooks
+* Faster
+
+---
+
+## Client Component
+
+```tsx id="p7q8r9"
+"use client";
+
+export default function Page() {
+  return <button onClick={() => alert("Hi")}>Click</button>;
+}
+```
+
+* Runs in browser
+* Interactive
+* Uses hooks
+
+---
+
+# 7. Rendering Flow in Next.js
+
+```
+Request → Server Component → Fetch Data → Render HTML → Browser loads → Hydration (if client components exist)
+```
+
+---
+
+# 8. Hydration (Important Concept)
+
+Hydration means:
+
+> React attaches interactivity to server-rendered HTML in the browser.
+
+Example:
+
+* Server sends HTML
+* Browser loads it
+* React makes buttons clickable
+
+---
+
+# 9. Choosing Rendering Strategy
+
+| Use Case       | Best Rendering |
+| -------------- | -------------- |
+| Blog           | SSG / ISR      |
+| Dashboard      | CSR / SSR      |
+| Real-time data | SSR            |
+| Landing page   | SSG            |
+| E-commerce     | ISR            |
+
+---
+
+# 10. Real-World Example Combination
+
+A modern Next.js app often mixes:
+
+* Landing page → SSG
+* Product page → ISR
+* Dashboard → SSR/CSR
+* API → Route Handlers
+
+---
+
+# Summary
+
+Next.js rendering types:
+
+* **CSR** → Browser renders UI
+* **SSR** → Server renders per request
+* **SSG** → Build-time rendering
+* **ISR** → Static + auto updates
+* **Server Components** → Default server rendering
+* **Client Components** → Interactive UI
+
+
+
+
+
+---
+
+
+
+
+
+
+
